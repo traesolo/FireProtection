@@ -13,6 +13,7 @@ app.commandLine.appendSwitch('--disable-background-timer-throttling') // 禁用�
 app.commandLine.appendSwitch('--disable-renderer-backgrounding') // 禁用渲染器后台化
 app.commandLine.appendSwitch('--disable-backgrounding-occluded-windows') // 禁用被遮挡窗口的后台化
 app.commandLine.appendSwitch('--disable-features', 'VizDisplayCompositor') // 禁用某些GPU特性以减少内存使用
+app.commandLine.appendSwitch('--no-sandbox') // 禁用沙盒模式，解决ARM64 Linux环境运行问题
 
 // 视频流管理
 const videoStreams = new Map() // 存储活跃的视频流
