@@ -20,20 +20,25 @@ jobs:
         node-version: '18'
         cache: 'npm'
     
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libnss3-dev libatk-bridge2.0-dev libdrm2 libxcomposite1 libxdamage1 libxrandr2 libgbm1 libxss1 libasound2-dev
+    
     - name: Install dependencies
       run: npm ci
     
-    - name: Build frontend
-      run: npm run build
-    
     - name: Build Linux app
-      run: npx electron-builder --linux
+      run: npm run electron:build:linux
     
     - name: Upload artifacts
       uses: actions/upload-artifact@v3
       with:
         name: linux-app-${{ github.sha }}
-        path: dist-electron/*.tar.gz
+        path: |
+          dist-electron/*.tar.gz
+          dist-electron/*.AppImage
+          dist-electron/*.deb
         retention-days: 30
     
     - name: Create Release (on tag)
