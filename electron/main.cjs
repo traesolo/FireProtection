@@ -1,4 +1,4 @@
-const { app, BrowserWindow, globalShortcut, dialog, ipcMain } = require('electron')
+const { app, BrowserWindow, globalShortcut, dialog, ipcMain, Menu } = require('electron')
 const path = require('path')
 const fs = require('fs')
 const { spawn } = require('child_process')
@@ -152,7 +152,7 @@ function createWindow() {
             nodeIntegration: false,
             contextIsolation: true,
             preload: path.join(__dirname, 'preload.cjs'),
-            webSecurity: true, // 始终启用web安全检查
+            webSecurity: false, // 禁用web安全检查以支持开发者工具
             allowRunningInsecureContent: false, // 禁止运行不安全内容
             // 4核2G硬件优化配置
             backgroundThrottling: false, // 禁用后台节流
@@ -198,11 +198,32 @@ function createWindow() {
     // 开发模式显示菜单栏
     mainWindow.setMenuBarVisibility(isDev)
 
-    // 右键菜单处理
-    mainWindow.webContents.on('context-menu', (e) => {
-        if (!isDev) {
-            e.preventDefault()
-        }
+    // 右键菜单处理 - 添加检查元素功能
+    mainWindow.webContents.on('context-menu', (e, params) => {
+        console.log('右键菜单触发')
+        const contextMenu = Menu.buildFromTemplate([
+            {
+                label: '检查元素',
+                click: () => {
+                    mainWindow.webContents.inspectElement(params.x, params.y)
+                }
+            },
+            {
+                label: '开发者工具',
+                click: () => {
+                    mainWindow.webContents.toggleDevTools()
+                }
+            },
+            { type: 'separator' },
+            {
+                label: '刷新',
+                accelerator: 'F5',
+                click: () => {
+                    mainWindow.webContents.reload()
+                }
+            }
+        ])
+        contextMenu.popup({ window: mainWindow })
     })
 
     // 关闭事件处理
