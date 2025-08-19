@@ -22,7 +22,7 @@ export class VideoStreamManager {
      */
     async startStream(config) {
         try {
-            console.log('开始启动视频流:', config)
+            // 开始启动视频流
 
             if (this.streams.has(config.id)) {
                 console.warn('视频流已存在:', config.id)
@@ -31,7 +31,7 @@ export class VideoStreamManager {
 
             // 构建RTSP URL
             const rtspUrl = this.buildRTSPUrl(config)
-            console.log('RTSP URL:', rtspUrl)
+            // 构建RTSP URL
 
             if (this.isElectron) {
                 // Electron环境：使用FFmpeg处理RTSP流
@@ -49,28 +49,34 @@ export class VideoStreamManager {
                         startTime: new Date(),
                         status: 'running'
                     })
-                    console.log('视频流启动成功:', config.id, 'HLS URL:', result.hlsUrl)
+                    // 视频流启动成功
                     return { success: true, streamId: config.id, hlsUrl: result.hlsUrl }
                 } else {
-                    console.error('视频流启动失败:', result.error)
+                    window.alert(`视频流启动失败: ${result.error}`)
                     return { success: false, message: result.error }
                 }
             } else {
                 // 浏览器环境：使用模拟视频流
                 const mockHlsUrl = `http://localhost:8080/hls/${config.id}.m3u8`
-                this.createMockVideoStream(config)
-                this.streams.set(config.id, {
-                    config,
-                    rtspUrl,
-                    hlsUrl: mockHlsUrl,
-                    startTime: new Date(),
-                    status: 'running'
-                })
-                console.log('浏览器环境模拟视频流启动:', config.id, 'Mock HLS URL:', mockHlsUrl)
-                return { success: true, streamId: config.id, hlsUrl: mockHlsUrl }
+                
+                try {
+                    this.createMockVideoStream(config)
+                    this.streams.set(config.id, {
+                        config,
+                        rtspUrl,
+                        hlsUrl: mockHlsUrl,
+                        startTime: new Date(),
+                        status: 'running'
+                    })
+                    // 浏览器环境模拟视频流启动成功
+                    return { success: true, streamId: config.id, hlsUrl: mockHlsUrl }
+                } catch (mockError) {
+                    window.alert(`创建模拟视频流失败: ${mockError.message}`)
+                    return { success: false, message: `模拟视频流创建失败: ${mockError.message}` }
+                }
             }
         } catch (error) {
-            console.error('启动视频流异常:', error)
+            window.alert(`启动视频流异常: ${error.message}`)
             return { success: false, message: error.message }
         }
     }
@@ -81,7 +87,7 @@ export class VideoStreamManager {
      */
     async stopStream(streamId) {
         try {
-            console.log('停止视频流:', streamId)
+            // 停止视频流
 
             if (!this.streams.has(streamId)) {
                 console.warn('视频流不存在:', streamId)
@@ -93,10 +99,10 @@ export class VideoStreamManager {
                 const result = await window.electronAPI.videoStream.stop(streamId)
                 if (result.success) {
                     this.streams.delete(streamId)
-                    console.log('视频流停止成功:', streamId)
+                    // 视频流停止成功
                     return { success: true }
                 } else {
-                    console.error('视频流停止失败:', result.error)
+                    window.alert(`视频流停止失败: ${result.error}`)
                     return { success: false, message: result.error }
                 }
             } else {
@@ -106,7 +112,7 @@ export class VideoStreamManager {
                 return { success: true }
             }
         } catch (error) {
-            console.error('停止视频流异常:', error)
+            window.alert(`停止视频流异常: ${error.message}`)
             return { success: false, message: error.message }
         }
     }
@@ -169,6 +175,8 @@ export class VideoStreamManager {
      * @param {Object} config - 摄像头配置
      */
     createMockVideoStream(config) {
+        // 开始创建模拟视频流
+        
         // 添加重试机制，确保DOM元素存在
         const findContainer = () => {
             return document.getElementById(config.containerId)
@@ -181,14 +189,19 @@ export class VideoStreamManager {
             setTimeout(() => {
                 container = findContainer()
                 if (!container) {
-                    console.error('找不到视频容器:', config.containerId)
-                    return
+                    window.alert(`找不到视频容器: ${config.containerId}`)
+                    throw new Error(`找不到视频容器: ${config.containerId}`)
                 }
-                this.createVideoContent(container, config)
+                try {
+                    this.createVideoContent(container, config)
+                } catch (error) {
+                    window.alert(`延迟创建视频内容失败: ${error.message}`)
+                }
             }, 200)
             return
         }
 
+        // 找到视频容器，开始创建内容
         this.createVideoContent(container, config)
     }
 
@@ -327,9 +340,9 @@ export class VideoStreamManager {
                 clearInterval(updateInterval)
             }
 
-            console.log('模拟视频流创建成功:', config.id)
+            // 模拟视频流创建成功
         } catch (error) {
-            console.error('创建模拟视频流失败:', error)
+            window.alert(`创建模拟视频流失败: ${error.message}`)
             // 显示错误信息
             if (container) {
                 container.innerHTML = `<div class="monitor-placeholder" style="color: #ff6b6b;">视频流创建失败: ${error.message}</div>`

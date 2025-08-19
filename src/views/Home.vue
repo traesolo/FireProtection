@@ -331,7 +331,7 @@ const startVideoStream = async (position) => {
 
         // 安全检查
         if (!videoStreams || !videoStreams.value || !videoStreams.value[position]) {
-            console.error(`${position}视频流状态对象不存在`)
+            window.alert(`${position}视频流状态对象不存在`)
             return
         }
 
@@ -353,7 +353,7 @@ const startVideoStream = async (position) => {
             try {
                 if (!isUnmounted.value && videoStreams.value && videoStreams.value[position]) {
                     videoStreams.value[position].hlsUrl = result.hlsUrl
-                    console.log(`${position}视频流启动成功:`, result.hlsUrl)
+                    // 视频流启动成功
 
                     // 先设置 active 状态，让 video 元素渲染到 DOM
                     videoStreams.value[position].active = true
@@ -374,9 +374,10 @@ const startVideoStream = async (position) => {
         } else {
             try {
                 if (!isUnmounted.value && videoStreams.value && videoStreams.value[position]) {
-                    let errorMessage = result.error || '启动失败'
-                    let detailedError = errorMessage
+                    // 从videoStreamManager返回的错误信息在message字段中
+                    let errorMessage = result.message || result.error || '启动失败'
                     
+                    let detailedError = errorMessage
                     // 根据错误类型提供更详细的提示
                     if (errorMessage.includes('FFmpeg未找到')) {
                         detailedError = 'FFmpeg程序未安装或路径配置错误，请检查Linux系统环境'
@@ -397,7 +398,7 @@ const startVideoStream = async (position) => {
             } catch (reactiveError) {
                 console.warn('设置视频流错误状态时发生错误:', reactiveError)
             }
-            console.error(`${position}视频流启动失败:`, result.error)
+            window.alert(`${position}视频流启动失败: ${result.message || result.error || '未知错误'}`)
         }
     } catch (error) {
         try {
@@ -423,7 +424,7 @@ const startVideoStream = async (position) => {
         } catch (reactiveError) {
             console.warn('设置视频流异常状态时发生错误:', reactiveError)
         }
-        console.error(`${position}视频流异常:`, error)
+        window.alert(`${position}视频流异常: ${error.message || error}`)
     } finally {
         try {
             if (!isUnmounted.value && videoStreams && videoStreams.value && videoStreams.value[position]) {
@@ -483,7 +484,7 @@ const initHlsPlayer = async (position, hlsUrl) => {
         }
 
         if (!videoElement) {
-            console.error(`经过${maxRetries}次尝试后仍找不到${position}视频元素，DOM可能未正确渲染`)
+            window.alert(`经过${maxRetries}次尝试后仍找不到${position}视频元素，DOM可能未正确渲染`)
             if (!isUnmounted.value && videoStreams.value && videoStreams.value[position]) {
                 videoStreams.value[position].error = 'DOM元素未找到'
             }
@@ -518,12 +519,12 @@ const initHlsPlayer = async (position, hlsUrl) => {
             hls.on(Hls.Events.MANIFEST_PARSED, () => {
                 console.log(`${position}视频流HLS清单解析完成，开始播放`)
                 videoElement.play().catch(e => {
-                    console.error(`${position}视频播放失败:`, e)
+                    window.alert(`${position}视频播放失败: ${e.message || e}`)
                 })
             })
 
             hls.on(Hls.Events.ERROR, (event, data) => {
-                console.error(`${position}视频流HLS错误:`, data)
+                window.alert(`${position}视频流HLS错误: ${data.details || data.type || '未知错误'}`)
 
                 // 检查组件是否已经卸载，防止访问已销毁的响应式对象
                 if (isUnmounted.value) {
@@ -571,15 +572,15 @@ const initHlsPlayer = async (position, hlsUrl) => {
             videoElement.src = hlsUrl
             videoElement.addEventListener('loadedmetadata', () => {
                 videoElement.play().catch(e => {
-                    console.error(`${position}视频播放失败:`, e)
+                    window.alert(`${position}视频播放失败: ${e.message || e}`)
                 })
             })
         } else {
-            console.error('浏览器不支持HLS播放')
+            window.alert('浏览器不支持HLS播放')
             videoStreams.value[position].error = '浏览器不支持HLS播放'
         }
     } catch (error) {
-        console.error(`初始化${position}HLS播放器失败:`, error)
+        window.alert(`初始化${position}HLS播放器失败: ${error.message || error}`)
         if (!isUnmounted.value && videoStreams.value && videoStreams.value[position]) {
             videoStreams.value[position].error = '播放器初始化失败'
         }
@@ -609,13 +610,13 @@ const stopVideoStream = async (position) => {
         videoStreams.value[position].error = null
         console.log(`${position}视频流已停止`)
     } catch (error) {
-        console.error(`停止${position}视频流失败:`, error)
+        window.alert(`停止${position}视频流失败: ${error.message || error}`)
     }
 }
 
 // 处理视频错误
 const handleVideoError = (position, event) => {
-    console.error(`${position}视频播放错误:`, event)
+    window.alert(`${position}视频播放错误: ${event.message || event.type || '未知错误'}`)
     if (!isUnmounted.value && videoStreams.value && videoStreams.value[position]) {
         videoStreams.value[position].error = '视频播放失败'
         videoStreams.value[position].active = false
