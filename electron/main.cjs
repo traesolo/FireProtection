@@ -150,20 +150,14 @@ function createWindow() {
         webPreferences: {
             nodeIntegration: false,
             contextIsolation: true,
-            enableRemoteModule: false,
             preload: path.join(__dirname, 'preload.cjs'),
             webSecurity: true, // 始终启用web安全检查
             allowRunningInsecureContent: false, // 禁止运行不安全内容
             // 4核2G硬件优化配置
             backgroundThrottling: false, // 禁用后台节流
-            offscreen: false, // 禁用离屏渲染
-            experimentalFeatures: false, // 禁用实验性功能
-            plugins: false, // 禁用插件
-            webgl: false, // 禁用WebGL以节省GPU内存
             nodeIntegrationInWorker: false, // 禁用Worker中的Node集成
             nodeIntegrationInSubFrames: false, // 禁用子框架中的Node集成
-            spellcheck: false, // 禁用拼写检查
-            enableWebSQL: false // 禁用WebSQL
+            spellcheck: false // 禁用拼写检查
         },
         show: false
     }

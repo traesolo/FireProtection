@@ -17,13 +17,13 @@ jobs:
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '18'
+        node-version: '20'
         cache: 'npm'
     
     - name: Install system dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y libnss3-dev libatk-bridge2.0-dev libdrm2 libxcomposite1 libxdamage1 libxrandr2 libgbm1 libxss1 libasound2-dev
+        sudo apt-get install -y libnss3-dev libatk-bridge2.0-dev libdrm2 libxcomposite1 libxdamage1 libxrandr2 libgbm1 libxss1 libasound2-dev libgtk-3-dev libxss1 libgconf-2-4 libxtst6 libxrandr2 libasound2-dev libpangocairo-1.0-0 libatk1.0-dev libcairo-gobject2 libgtk-3-dev libgdk-pixbuf2.0-dev
     
     - name: Install dependencies
       run: npm ci
@@ -35,6 +35,10 @@ jobs:
         npm_config_target_arch: arm64
         npm_config_target_platform: linux
         npm_config_arch: arm64
+        npm_config_cache: /tmp/.npm
+        npm_config_build_from_source: true
+        ELECTRON_CACHE: /tmp/.electron
+        ELECTRON_BUILDER_CACHE: /tmp/.electron-builder
     
     - name: Upload ARM64 artifacts
       uses: actions/upload-artifact@v4
