@@ -46,8 +46,6 @@ jobs:
         name: linux-arm64-app-${{ github.sha }}
         path: |
           dist-electron/*arm64*.tar.gz
-          dist-electron/*arm64*.AppImage
-          dist-electron/*arm64*.deb
         retention-days: 30
     
     - name: Create Release (on tag)
@@ -56,7 +54,5 @@ jobs:
       with:
         files: |
           dist-electron/*arm64*.tar.gz
-          dist-electron/*arm64*.AppImage
-          dist-electron/*arm64*.deb
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
