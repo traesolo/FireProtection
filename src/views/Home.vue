@@ -374,7 +374,25 @@ const startVideoStream = async (position) => {
         } else {
             try {
                 if (!isUnmounted.value && videoStreams.value && videoStreams.value[position]) {
-                    videoStreams.value[position].error = result.error || '启动失败'
+                    let errorMessage = result.error || '启动失败'
+                    let detailedError = errorMessage
+                    
+                    // 根据错误类型提供更详细的提示
+                    if (errorMessage.includes('FFmpeg未找到')) {
+                        detailedError = 'FFmpeg程序未安装或路径配置错误，请检查Linux系统环境'
+                    } else if (errorMessage.includes('RTSP') || errorMessage.includes('rtsp')) {
+                        detailedError = '摄像头RTSP连接失败，请检查IP地址、端口和认证信息'
+                    } else if (errorMessage.includes('timeout') || errorMessage.includes('超时')) {
+                        detailedError = '连接超时，请检查网络连接和摄像头状态'
+                    } else if (errorMessage.includes('permission') || errorMessage.includes('权限')) {
+                        detailedError = '权限不足，请检查用户名和密码'
+                    } else if (errorMessage.includes('Connection refused') || errorMessage.includes('连接被拒绝')) {
+                        detailedError = '摄像头拒绝连接，请检查设备状态和网络配置'
+                    } else if (errorMessage.includes('No route to host') || errorMessage.includes('无法到达主机')) {
+                        detailedError = '网络不可达，请检查IP地址和网络连接'
+                    }
+                    
+                    videoStreams.value[position].error = detailedError
                 }
             } catch (reactiveError) {
                 console.warn('设置视频流错误状态时发生错误:', reactiveError)
@@ -384,7 +402,23 @@ const startVideoStream = async (position) => {
     } catch (error) {
         try {
             if (!isUnmounted.value && videoStreams && videoStreams.value && videoStreams.value[position]) {
-                videoStreams.value[position].error = error.message || '连接异常'
+                let errorMessage = error.message || '连接异常'
+                let detailedError = errorMessage
+                
+                // 根据异常类型提供更详细的提示
+                if (errorMessage.includes('Network Error') || errorMessage.includes('网络错误')) {
+                    detailedError = '网络连接异常，请检查网络状态和防火墙设置'
+                } else if (errorMessage.includes('spawn') && errorMessage.includes('ENOENT')) {
+                    detailedError = 'FFmpeg程序未找到，请确保已正确安装FFmpeg'
+                } else if (errorMessage.includes('ECONNREFUSED')) {
+                    detailedError = '连接被拒绝，请检查摄像头IP地址和端口设置'
+                } else if (errorMessage.includes('ETIMEDOUT')) {
+                    detailedError = '连接超时，请检查网络连接和摄像头状态'
+                } else if (errorMessage.includes('EHOSTUNREACH')) {
+                    detailedError = '主机不可达，请检查IP地址和网络路由'
+                }
+                
+                videoStreams.value[position].error = detailedError
             }
         } catch (reactiveError) {
             console.warn('设置视频流异常状态时发生错误:', reactiveError)
@@ -822,11 +856,52 @@ const handleSettingsConfirm = async () => {
     showSettingsDialog.value = false
 }
 
-// 蜂鸣器报警功能
-const createBeepSound = () => {
+// 备用蜂鸣器方案（使用HTML5 Audio）
+const playFallbackBeep = (frequency) => {
     try {
+        // 创建一个简单的蜂鸣声音频文件的Data URL
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)()
+        const oscillator = audioContext.createOscillator()
+        const gainNode = audioContext.createGain()
+        
+        oscillator.frequency.setValueAtTime(frequency, audioContext.currentTime)
+        oscillator.type = 'square'
+        gainNode.gain.setValueAtTime(0.1, audioContext.currentTime)
+        
+        oscillator.connect(gainNode)
+        gainNode.connect(audioContext.destination)
+        
+        oscillator.start()
+        oscillator.stop(audioContext.currentTime + 0.1)
+        
+        console.log(`备用蜂鸣器播放: ${frequency}Hz`)
+    } catch (error) {
+        console.error('备用蜂鸣器也失败:', error)
+        // 最后的备用方案：系统提示音
+        if (window.electronAPI && window.electronAPI.playSystemBeep) {
+            window.electronAPI.playSystemBeep()
+        }
+    }
+}
+
+// 蜂鸣器报警功能
+const createBeepSound = async () => {
+    try {
+        // 检查浏览器是否支持Web Audio API
+        if (!window.AudioContext && !window.webkitAudioContext) {
+            console.error('浏览器不支持Web Audio API')
+            playFallbackBeep(1000)
+            return
+        }
+
         // 创建音频上下文
         alarmState.value.audioContext = new (window.AudioContext || window.webkitAudioContext)()
+        
+        // 检查音频上下文状态，如果是suspended需要恢复
+        if (alarmState.value.audioContext.state === 'suspended') {
+            await alarmState.value.audioContext.resume()
+            console.log('音频上下文已恢复')
+        }
 
         // 创建振荡器（产生声音）
         alarmState.value.oscillator = alarmState.value.audioContext.createOscillator()
@@ -849,14 +924,28 @@ const createBeepSound = () => {
         console.log('蜂鸣器报警已启动')
     } catch (error) {
         console.error('创建蜂鸣器声音失败:', error)
+        playFallbackBeep(1000)
     }
 }
 
 // 预警蜂鸣器功能
-const createWarningBeepSound = () => {
+const createWarningBeepSound = async () => {
     try {
+        // 检查浏览器是否支持Web Audio API
+        if (!window.AudioContext && !window.webkitAudioContext) {
+            console.error('浏览器不支持Web Audio API')
+            playFallbackBeep(800)
+            return
+        }
+
         // 创建音频上下文
         alarmState.value.warningAudioContext = new (window.AudioContext || window.webkitAudioContext)()
+        
+        // 检查音频上下文状态，如果是suspended需要恢复
+        if (alarmState.value.warningAudioContext.state === 'suspended') {
+            await alarmState.value.warningAudioContext.resume()
+            console.log('预警音频上下文已恢复')
+        }
 
         // 创建振荡器（产生声音）
         alarmState.value.warningOscillator = alarmState.value.warningAudioContext.createOscillator()
@@ -879,6 +968,7 @@ const createWarningBeepSound = () => {
         console.log('预警蜂鸣器已启动')
     } catch (error) {
         console.error('创建预警蜂鸣器声音失败:', error)
+        playFallbackBeep(800)
     }
 }
 
@@ -927,14 +1017,14 @@ const stopWarningBeepSound = () => {
 }
 
 // 启动报警（闪烁+蜂鸣器）
-const startAlarm = () => {
+const startAlarm = async () => {
     if (alarmState.value.isAlarming) return
 
     console.log('启动报警模式')
     alarmState.value.isAlarming = true
 
     // 启动蜂鸣器
-    createBeepSound()
+    await createBeepSound()
 
     // 启动闪烁效果
     alarmState.value.flashTimer = setInterval(() => {
@@ -958,14 +1048,14 @@ const startAlarm = () => {
 }
 
 // 启动预警（黄灯闪烁+蜂鸣器）
-const startWarning = () => {
+const startWarning = async () => {
     if (alarmState.value.isWarning) return
 
     console.log('启动预警模式')
     alarmState.value.isWarning = true
 
     // 启动预警蜂鸣器
-    createWarningBeepSound()
+    await createWarningBeepSound()
 
     // 启动黄灯闪烁效果
     alarmState.value.warningFlashTimer = setInterval(() => {
@@ -1093,7 +1183,9 @@ const checkAlarmStatus = () => {
             if (alarmState.value?.isWarning) {
                 stopWarning()
             }
-            startAlarm()
+            startAlarm().catch(error => {
+                console.error('启动报警失败:', error)
+            })
         } else if (!hasDeviceAlarm && alarmState.value?.isAlarming) {
             console.log('停止设备报警！')
             stopAlarm()
@@ -1103,7 +1195,9 @@ const checkAlarmStatus = () => {
         if (!hasDeviceAlarm) {
             if (hasDeviceWarning && !alarmState.value?.isWarning) {
                 console.log('触发设备预警！')
-                startWarning()
+                startWarning().catch(error => {
+                    console.error('启动预警失败:', error)
+                })
             } else if (!hasDeviceWarning && alarmState.value?.isWarning) {
                 console.log('停止设备预警！')
                 stopWarning()
