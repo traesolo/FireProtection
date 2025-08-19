@@ -94,6 +94,34 @@ exports.default = async function afterPack(context) {
   fs.writeFileSync(checklistPath, checklist)
   console.log('创建部署检查清单: deployment-checklist.txt')
   
+  // 设置FFmpeg二进制文件执行权限（Linux/macOS）
+  if (electronPlatformName === 'linux' || electronPlatformName === 'darwin') {
+    const ffmpegUnpackedPath = path.join(resourcesPath, 'app.asar.unpacked', 'ffmpeg')
+    if (fs.existsSync(ffmpegUnpackedPath)) {
+      console.log('设置FFmpeg文件执行权限...')
+      
+      // 查找所有FFmpeg二进制文件
+      const ffmpegBinaries = [
+        path.join(ffmpegUnpackedPath, 'ffmpeg-7.0.2-amd64-static', 'ffmpeg'),
+        path.join(ffmpegUnpackedPath, 'ffmpeg-7.0.2-arm64-static', 'ffmpeg'),
+        path.join(ffmpegUnpackedPath, 'ffmpeg-7.1.1-essentials_build', 'bin', 'ffmpeg')
+      ]
+      
+      ffmpegBinaries.forEach(ffmpegPath => {
+        if (fs.existsSync(ffmpegPath)) {
+          try {
+            fs.chmodSync(ffmpegPath, 0o755) // 设置为可执行
+            console.log(`✅ 设置执行权限: ${path.basename(path.dirname(ffmpegPath))}/${path.basename(ffmpegPath)}`)
+          } catch (error) {
+            console.error(`❌ 设置执行权限失败: ${ffmpegPath}`, error.message)
+          }
+        }
+      })
+    } else {
+      console.warn('⚠️  未找到FFmpeg unpacked目录')
+    }
+  }
+  
   console.log('✅ 构建后优化完成')
 }
 
