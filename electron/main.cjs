@@ -596,6 +596,12 @@ app.whenReady().then(async () => {
             showExitDialog()
         })
 
+        // 生产模式下启用F12开发者工具（用于调试）
+        globalShortcut.register('F12', () => {
+            console.log('F12开发者工具（生产模式）')
+            mainWindow.webContents.toggleDevTools()
+        })
+
         // 禁用其他快捷键（保留Alt+F4和F12）
         globalShortcut.register('F11', () => { })
         globalShortcut.register('Escape', () => { })

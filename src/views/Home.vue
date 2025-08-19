@@ -728,9 +728,9 @@ const fetchCustomDeviceInfo = async () => {
                     // 开发环境：直接使用相对路径，让Vite代理服务器处理
                     displayPath = iconPath
                 } else {
-                    // 生产环境：使用127.0.0.1拼接完整的服务器地址
+                    // 生产环境：使用127.0.0.1:8061拼接完整的服务器地址
                     displayPath = iconPath.startsWith('http') ? iconPath : 
-                        `http://127.0.0.1${iconPath}`
+                        `http://127.0.0.1:8061${iconPath}`
                 }
             }
             
@@ -1308,8 +1308,8 @@ const updateDeviceGroups = () => {
                     // 开发环境：使用test.junhekh.cn:8061拼接完整路径
                     deviceIcon = device.icon.startsWith('http') ? device.icon : `http://test.junhekh.cn:8061${device.icon}`
                 } else {
-                    // 生产环境：使用127.0.0.1拼接完整路径
-                    deviceIcon = device.icon.startsWith('http') ? device.icon : `http://127.0.0.1${device.icon}`
+                    // 生产环境：使用127.0.0.1:8061拼接完整路径
+                    deviceIcon = device.icon.startsWith('http') ? device.icon : `http://127.0.0.1:8061${device.icon}`
                 }
             } else {
                 // 如果API没有返回icon字段，使用代码中定义的映射
@@ -1571,9 +1571,9 @@ const handleUploadSuccess = (response, file) => {
             settingsForm.value.uploadedImageUrl = response.path.startsWith('http') ? 
                 response.path : `http://test.junhekh.cn:8061${response.path}`
         } else {
-            // 生产环境：使用127.0.0.1拼接完整的服务器地址
+            // 生产环境：使用127.0.0.1:8061拼接完整的服务器地址
             settingsForm.value.uploadedImageUrl = response.path.startsWith('http') ? 
-                response.path : `http://127.0.0.1${response.path}`
+                response.path : `http://127.0.0.1:8061${response.path}`
         }
         // 拼接完整路径用于接口传参
         fullImagePath.value = `${API_CONFIG.BASE_URL}${response.path}`

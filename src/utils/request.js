@@ -3,7 +3,7 @@ import axios from 'axios'
 // 根据环境配置不同的API地址
 const getBaseURL = () => {
     if (process.env.NODE_ENV === 'production') {
-        return 'http://127.0.0.1'
+        return 'http://127.0.0.1:8061'
     } else {
         // 开发环境使用相对路径，通过Vite代理转发
         return ''

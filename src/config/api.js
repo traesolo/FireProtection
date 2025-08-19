@@ -1,6 +1,6 @@
 // API配置文件
 export const API_CONFIG = {
-    BASE_URL: process.env.NODE_ENV === 'production' ? 'http://127.0.0.1' : '',
+    BASE_URL: process.env.NODE_ENV === 'production' ? 'http://127.0.0.1:8061' : '',
     ENDPOINTS: {
         // 设备参数相关
         THRESHOLDS: '/fire-monitor/api/config/thresholds',
