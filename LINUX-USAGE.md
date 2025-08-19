@@ -106,7 +106,30 @@ sudo yum install nss atk at-spi2-atk libdrm libXcomposite libXdamage libXrandr m
 
 ## 🐛 常见问题
 
-### 1. 应用无法启动
+### 1. 无法执行二进制文件
+
+**错误信息：** `cannot execute binary file` 或 `无法执行二进制文件`
+
+**原因：** 架构不匹配，当前构建的是x64版本，需要64位Linux系统
+
+```bash
+# 检查系统架构
+uname -m
+# 应该显示 x86_64 或 amd64
+
+# 检查文件架构
+file fireprotection
+# 应该显示类似：ELF 64-bit LSB executable, x86-64
+
+# 如果系统是32位，需要重新构建32位版本
+# 或者在64位系统上运行
+```
+
+**解决方案：**
+- ✅ **推荐：** 使用64位Linux系统（Ubuntu 18.04+, CentOS 7+等）
+- ⚠️ **备选：** 如需32位支持，请联系开发团队重新构建
+
+### 2. 应用无法启动
 ```bash
 # 检查当前目录和文件权限
 ls -la
@@ -119,21 +142,31 @@ cd linux-app-*/消防设备终端-1.0.0-x64/消防设备终端-1.0.0-x64/
 chmod +x fireprotection
 ```
 
-### 2. 缺少依赖库
+### 3. 缺少依赖库
+
+**错误信息：** `error while loading shared libraries`
+
 ```bash
 # 查看缺少的依赖
 ldd fireprotection
 
-# 安装缺少的库（以Ubuntu为例）
-sudo apt-get install <missing-library>
+# 常见缺失依赖的安装（Ubuntu/Debian）
+sudo apt-get update
+sudo apt-get install libnss3 libatk-bridge2.0-0 libdrm2 libxcomposite1 \
+                     libxdamage1 libxrandr2 libgbm1 libxss1 libasound2 \
+                     libgtk-3-0 libgconf-2-4
+
+# CentOS/RHEL/Fedora
+sudo yum install nss atk at-spi2-atk libdrm libXcomposite libXdamage \
+                 libXrandr mesa-libgbm libXScrnSaver alsa-lib gtk3
 ```
 
-### 3. 视频无法显示
+### 4. 视频无法显示
 - 确保网络连接正常
 - 检查设备IP和端口配置
 - 验证设备是否支持当前协议
 
-### 4. 目录结构问题
+### 5. 目录结构问题
 ```bash
 # 如果找不到文件，检查目录结构
 find . -name "fireprotection" -type f
@@ -144,7 +177,7 @@ tree
 find . -type f | head -20
 ```
 
-### 5. 权限问题
+### 6. 权限问题
 ```bash
 # 如需访问特殊设备或端口，可能需要管理员权限
 sudo ./fireprotection
