@@ -26,7 +26,20 @@ function findFFmpegPath() {
     const platform = process.platform
     const arch = process.arch
     
-    // 检测是否为打包环境
+    console.log('检测FFmpeg路径，平台:', platform, '架构:', arch)
+    
+    try {
+        // 优先使用ffmpeg-static包提供的FFmpeg（自动适配架构）
+        const ffmpegStatic = require('ffmpeg-static')
+        if (ffmpegStatic && fs.existsSync(ffmpegStatic)) {
+            console.log('使用ffmpeg-static包:', ffmpegStatic)
+            return ffmpegStatic
+        }
+    } catch (error) {
+        console.warn('ffmpeg-static包不可用，使用备用方案:', error.message)
+    }
+    
+    // 备用方案：使用手动下载的FFmpeg
     const isPackaged = app.isPackaged
     let ffmpegDir
     
@@ -38,8 +51,7 @@ function findFFmpegPath() {
         ffmpegDir = path.join(__dirname, '../ffmpeg')
     }
     
-    console.log('检测FFmpeg路径，平台:', platform, '架构:', arch, '打包状态:', isPackaged)
-    console.log('FFmpeg目录:', ffmpegDir)
+    console.log('使用备用FFmpeg目录:', ffmpegDir)
     
     let ffmpegPath
     
@@ -54,14 +66,14 @@ function findFFmpegPath() {
             ffmpegPath = path.join(ffmpegDir, 'ffmpeg-7.0.2-amd64-static', 'ffmpeg')
         }
     } else if (platform === 'darwin') {
-        // macOS平台（如果需要的话）
+        // macOS平台
         ffmpegPath = path.join(ffmpegDir, 'ffmpeg')
     } else {
         console.error('不支持的平台:', platform)
         return null
     }
     
-    console.log('FFmpeg路径:', ffmpegPath)
+    console.log('备用FFmpeg路径:', ffmpegPath)
     
     // 检查文件是否存在
     if (fs.existsSync(ffmpegPath)) {

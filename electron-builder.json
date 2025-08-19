@@ -12,7 +12,8 @@
     "package.json"
   ],
   "asarUnpack": [
-    "ffmpeg/**/*"
+    "ffmpeg/**/*",
+    "node_modules/ffmpeg-static/**/*"
   ],
   "extraMetadata": {
     "main": "electron/main.cjs"
