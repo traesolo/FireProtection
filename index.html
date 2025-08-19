@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>消防设备终端</title>
+    <!-- 字体配置 -->
+    <style>
+      @font-face {
+        font-family: 'Source Han Sans CN';
+        src: url('/fonts/SourceHanSancCN/SourceHanSansCN-VF.ttf.woff2') format('woff2'),
+             url('/fonts/SourceHanSancCN/SourceHanSansSC-VF.ttf') format('truetype');
+        font-weight: 100 900;
+        font-style: normal;
+        font-display: swap;
+      }
+      
+      @font-face {
+        font-family: 'YouSheBiaoTiHei';
+        src: url('/fonts/YouSheBiaoTiHei/YouSheBiaoTiHei-2.ttf') format('truetype');
+        font-weight: normal;
+        font-style: normal;
+        font-display: swap;
+      }
+      
+      body {
+        font-family: 'Source Han Sans CN', system-ui, Avenir, Helvetica, Arial, sans-serif;
+      }
+    </style>
+    <!-- HLS.js 视频播放库 -->
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@1.4.12/dist/hls.min.js"></script>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

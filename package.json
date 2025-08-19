@@ -1,0 +1,51 @@
+{
+  "name": "fireprotection",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "main": "electron/main.cjs",
+  "homepage": "./",
+  "author": {
+    "name": "FireProtection Team",
+    "email": "support@fireprotection.com"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "electron": "wait-on tcp:5173 && cross-env IS_DEV=true electron .",
+    "electron:pack": "electron-builder",
+    "electron:dev": "concurrently -k \"cross-env BROWSER=none npm run dev\" \"npm run electron\"",
+    "electron:pack:win": "electron-builder --win",
+    "electron:pack:mac": "electron-builder --mac",
+    "electron:pack:linux": "electron-builder --linux",
+    "electron:build": "npm run build && electron-builder",
+    "electron:build:win": "npm run build && electron-builder --win",
+    "electron:build:mac": "npm run build && electron-builder --mac",
+    "electron:build:linux": "npm run build && electron-builder --linux",
+    "electron:build:linux:wsl": "wsl npm run build && wsl npx electron-builder --linux",
+    "build:linux:remote": "node scripts/build-linux-remote.cjs",
+    "build:linux:docker": "docker build -t fireprotection-builder . && docker run --rm -v \"${PWD}:/workspace\" fireprotection-builder"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^4.0.0",
+    "cross-env": "^7.0.3",
+    "electron": "^22.0.0",
+    "electron-builder": "^23.6.0",
+    "sass": "^1.90.0",
+    "terser": "^5.43.1",
+    "vite": "^4.0.0",
+    "vue": "^3.2.45"
+  },
+  "dependencies": {
+    "axios": "^1.11.0",
+    "element-plus": "^2.10.7",
+    "express": "^5.1.0",
+    "hls.js": "^1.6.10",
+    "html2canvas": "^1.4.1",
+    "mqtt": "^5.14.0",
+    "pinia": "^2.0.28",
+    "vue": "^3.2.45",
+    "vue-router": "^4.1.6"
+  }
+}

@@ -1,0 +1,64 @@
+{
+  "appId": "com.fireprotection.terminal",
+  "productName": "消防设备终端",
+  "directories": {
+    "output": "dist-electron",
+    "buildResources": "build"
+  },
+  "files": [
+    "dist/**/*",
+    "electron/**/*",
+    "node_modules/**/*",
+    "package.json"
+  ],
+  "compression": "maximum",
+  "removePackageScripts": true,
+  "nodeGypRebuild": false,
+  "buildDependenciesFromSource": false,
+  "extraMetadata": {
+    "main": "electron/main.cjs"
+  },
+  "win": {
+    "target": [
+      {
+        "target": "nsis",
+        "arch": ["x64"]
+      },
+      {
+        "target": "portable",
+        "arch": ["x64"]
+      }
+    ],
+    "requestedExecutionLevel": "requireAdministrator",
+    "compression": "maximum",
+    "artifactName": "${productName}-${version}-${arch}-${ext}"
+  },
+  "linux": {
+    "target": [
+      {
+        "target": "tar.gz",
+        "arch": ["x64"]
+      }
+    ],
+    "category": "Utility",
+    "desktop": {
+      "Name": "消防设备终端",
+      "Comment": "Fire Protection Equipment Terminal",
+      "Categories": "Utility;System;",
+      "StartupNotify": "true"
+    },
+    "artifactName": "${productName}-${version}-${arch}.${ext}"
+  },
+  "remoteBuild": false,
+  "nsis": {
+    "oneClick": false,
+    "allowElevation": true,
+    "allowToChangeInstallationDirectory": true,
+    "createDesktopShortcut": true,
+    "createStartMenuShortcut": true,
+    "shortcutName": "消防设备终端",
+    "differentialPackage": false,
+    "packElevateHelper": false
+  },
+  "publish": null
+}
