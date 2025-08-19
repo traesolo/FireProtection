@@ -1,4 +1,4 @@
-name: Build Linux App (Multi-Arch)
+name: Build Linux ARM64 App
 
 on:
   push:
@@ -8,11 +8,8 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-linux:
+  build-linux-arm64:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        arch: [x64, arm64]
     
     steps:
     - uses: actions/checkout@v4
@@ -31,21 +28,22 @@ jobs:
     - name: Install dependencies
       run: npm ci
     
-    - name: Build Linux app (${{ matrix.arch }})
-      run: npm run electron:build:linux -- --${{ matrix.arch }}
+    - name: Build Linux ARM64 app
+      run: npm run electron:build:linux -- --arm64
       env:
-        npm_config_target_arch: ${{ matrix.arch }}
+        # Force ARM64 build
+        npm_config_target_arch: arm64
         npm_config_target_platform: linux
-        npm_config_arch: ${{ matrix.arch }}
+        npm_config_arch: arm64
     
-    - name: Upload artifacts (${{ matrix.arch }})
+    - name: Upload ARM64 artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: linux-${{ matrix.arch }}-app-${{ github.sha }}
+        name: linux-arm64-app-${{ github.sha }}
         path: |
-          dist-electron/*${{ matrix.arch }}*.tar.gz
-          dist-electron/*${{ matrix.arch }}*.AppImage
-          dist-electron/*${{ matrix.arch }}*.deb
+          dist-electron/*arm64*.tar.gz
+          dist-electron/*arm64*.AppImage
+          dist-electron/*arm64*.deb
         retention-days: 30
     
     - name: Create Release (on tag)
@@ -53,8 +51,8 @@ jobs:
       uses: softprops/action-gh-release@v1
       with:
         files: |
-          dist-electron/*${{ matrix.arch }}*.tar.gz
-          dist-electron/*${{ matrix.arch }}*.AppImage
-          dist-electron/*${{ matrix.arch }}*.deb
+          dist-electron/*arm64*.tar.gz
+          dist-electron/*arm64*.AppImage
+          dist-electron/*arm64*.deb
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
