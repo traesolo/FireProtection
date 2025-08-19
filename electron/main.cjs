@@ -25,9 +25,20 @@ const HLS_DIR = path.join(__dirname, '../hls') // HLS文件目录
 function findFFmpegPath() {
     const platform = process.platform
     const arch = process.arch
-    const ffmpegDir = path.join(__dirname, '../ffmpeg')
     
-    console.log('检测FFmpeg路径，平台:', platform, '架构:', arch)
+    // 检测是否为打包环境
+    const isPackaged = app.isPackaged
+    let ffmpegDir
+    
+    if (isPackaged) {
+        // 打包环境：FFmpeg文件在app.asar.unpacked目录中
+        ffmpegDir = path.join(process.resourcesPath, 'app.asar.unpacked', 'ffmpeg')
+    } else {
+        // 开发环境：FFmpeg文件在项目目录中
+        ffmpegDir = path.join(__dirname, '../ffmpeg')
+    }
+    
+    console.log('检测FFmpeg路径，平台:', platform, '架构:', arch, '打包状态:', isPackaged)
     console.log('FFmpeg目录:', ffmpegDir)
     
     let ffmpegPath

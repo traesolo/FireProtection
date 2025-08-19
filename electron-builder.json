@@ -8,7 +8,11 @@
     "dist/**/*",
     "electron/**/*",
     "node_modules/**/*",
+    "ffmpeg/**/*",
     "package.json"
+  ],
+  "asarUnpack": [
+    "ffmpeg/**/*"
   ],
   "extraMetadata": {
     "main": "electron/main.cjs"
