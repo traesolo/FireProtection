@@ -24,9 +24,10 @@ const HLS_DIR = path.join(__dirname, '../hls') // HLS文件目录
 // FFmpeg路径检测
 function findFFmpegPath() {
     const platform = process.platform
+    const arch = process.arch
     const ffmpegDir = path.join(__dirname, '../ffmpeg')
     
-    console.log('检测FFmpeg路径，平台:', platform)
+    console.log('检测FFmpeg路径，平台:', platform, '架构:', arch)
     console.log('FFmpeg目录:', ffmpegDir)
     
     let ffmpegPath
@@ -35,8 +36,12 @@ function findFFmpegPath() {
         // Windows平台
         ffmpegPath = path.join(ffmpegDir, 'ffmpeg-7.1.1-essentials_build', 'bin', 'ffmpeg.exe')
     } else if (platform === 'linux') {
-        // Linux平台
-        ffmpegPath = path.join(ffmpegDir, 'ffmpeg-7.0.2-amd64-static', 'ffmpeg')
+        // Linux平台 - 根据架构选择对应版本
+        if (arch === 'arm64' || arch === 'aarch64') {
+            ffmpegPath = path.join(ffmpegDir, 'ffmpeg-7.0.2-arm64-static', 'ffmpeg')
+        } else {
+            ffmpegPath = path.join(ffmpegDir, 'ffmpeg-7.0.2-amd64-static', 'ffmpeg')
+        }
     } else if (platform === 'darwin') {
         // macOS平台（如果需要的话）
         ffmpegPath = path.join(ffmpegDir, 'ffmpeg')
