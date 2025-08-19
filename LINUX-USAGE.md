@@ -2,58 +2,73 @@
 
 ## 📦 下载构建产物
 
-从GitHub Actions构建完成后，你可以下载以下格式的Linux应用包：
+从GitHub Actions构建完成后，下载的是一个压缩包，解压后的目录结构如下：
 
-- **`.AppImage`** - 便携式应用程序（推荐）
-- **`.deb`** - Debian/Ubuntu系统安装包
-- **`.tar.gz`** - 通用压缩包
+```
+linux-app-xxxxx/
+└── 消防设备终端-1.0.0-x64/
+    └── 消防设备终端-1.0.0-x64/
+        ├── fireprotection          # 主要可执行文件
+        ├── chrome_100_percent.pak
+        ├── chrome_200_percent.pak
+        ├── libEGL.so
+        ├── libffmpeg.so
+        └── ... (其他依赖文件)
+```
+
+**注意：** 实际构建产物是解压后的目录，不是单独的AppImage文件。
 
 ## 🚀 运行方式
 
-### 方式一：AppImage（推荐）
+### 方式一：直接运行（推荐）
 
-**优点：** 无需安装，直接运行，兼容性最好
-
-```bash
-# 1. 下载 .AppImage 文件到本地
-# 2. 添加执行权限
-chmod +x FireProtection-*.AppImage
-
-# 3. 直接运行
-./fireprotection-*.AppImage
-```
-
-### 方式二：DEB包安装
-
-**适用于：** Debian、Ubuntu及其衍生发行版
+**优点：** 无需安装，解压后直接运行
 
 ```bash
-# 安装deb包
-sudo dpkg -i FireProtection-*.deb
+# 1. 解压下载的压缩包
+unzip linux-app-*.zip
+# 或者
+tar -xzf linux-app-*.tar.gz
 
-# 如果有依赖问题，运行：
-sudo apt-get install -f
-
-# 运行应用（安装后可在应用菜单中找到）
-fireprotection
-```
-
-### 方式三：TAR.GZ解压运行
-
-**适用于：** 所有Linux发行版
-
-```bash
-# 1. 解压文件
-tar -xzf FireProtection-*.tar.gz
-
-# 2. 进入解压目录
-cd fireprotection-*/
+# 2. 进入应用目录（注意多层嵌套）
+cd linux-app-*/消防设备终端-1.0.0-x64/消防设备终端-1.0.0-x64/
 
 # 3. 添加执行权限
 chmod +x fireprotection
 
-# 4. 运行应用
+# 4. 直接运行
 ./fireprotection
+```
+
+### 方式三：DEB包安装（如果有提供）
+
+**适用于：** Debian、Ubuntu及其衍生发行版
+**注意：** 当前构建主要提供解压版本，DEB包可能需要单独构建
+
+```bash
+# 如果有deb包，可以这样安装
+sudo dpkg -i fireprotection-*.deb
+
+# 如果有依赖问题，运行：
+sudo apt-get install -f
+
+# 运行应用
+fireprotection
+```
+
+### 方式二：创建快捷方式（可选）
+
+**适用于：** 方便日常使用
+
+```bash
+# 1. 将应用移动到合适位置
+sudo mv 消防设备终端-1.0.0-x64 /opt/fireprotection
+
+# 2. 创建系统链接
+sudo ln -s /opt/fireprotection/fireprotection /usr/local/bin/fireprotection
+
+# 3. 现在可以在任何地方运行
+fireprotection
 ```
 
 ## 🔧 系统要求
@@ -93,11 +108,15 @@ sudo yum install nss atk at-spi2-atk libdrm libXcomposite libXdamage libXrandr m
 
 ### 1. 应用无法启动
 ```bash
-# 检查是否有执行权限
-ls -la fireprotection*
+# 检查当前目录和文件权限
+ls -la
+pwd
+
+# 确保在正确的目录中
+cd linux-app-*/消防设备终端-1.0.0-x64/消防设备终端-1.0.0-x64/
 
 # 添加执行权限
-chmod +x fireprotection*
+chmod +x fireprotection
 ```
 
 ### 2. 缺少依赖库
@@ -114,7 +133,18 @@ sudo apt-get install <missing-library>
 - 检查设备IP和端口配置
 - 验证设备是否支持当前协议
 
-### 4. 权限问题
+### 4. 目录结构问题
+```bash
+# 如果找不到文件，检查目录结构
+find . -name "fireprotection" -type f
+
+# 或者查看完整目录结构
+tree
+# 没有tree命令可以用：
+find . -type f | head -20
+```
+
+### 5. 权限问题
 ```bash
 # 如需访问特殊设备或端口，可能需要管理员权限
 sudo ./fireprotection
