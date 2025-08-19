@@ -20,7 +20,7 @@
 chmod +x FireProtection-*.AppImage
 
 # 3. 直接运行
-./FireProtection-*.AppImage
+./fireprotection-*.AppImage
 ```
 
 ### 方式二：DEB包安装
@@ -47,13 +47,13 @@ fireprotection
 tar -xzf FireProtection-*.tar.gz
 
 # 2. 进入解压目录
-cd FireProtection-*/
+cd fireprotection-*/
 
 # 3. 添加执行权限
-chmod +x FireProtection
+chmod +x fireprotection
 
 # 4. 运行应用
-./FireProtection
+./fireprotection
 ```
 
 ## 🔧 系统要求
@@ -94,16 +94,16 @@ sudo yum install nss atk at-spi2-atk libdrm libXcomposite libXdamage libXrandr m
 ### 1. 应用无法启动
 ```bash
 # 检查是否有执行权限
-ls -la FireProtection*
+ls -la fireprotection*
 
 # 添加执行权限
-chmod +x FireProtection*
+chmod +x fireprotection*
 ```
 
 ### 2. 缺少依赖库
 ```bash
 # 查看缺少的依赖
-ldd FireProtection
+ldd fireprotection
 
 # 安装缺少的库（以Ubuntu为例）
 sudo apt-get install <missing-library>
@@ -117,7 +117,7 @@ sudo apt-get install <missing-library>
 ### 4. 权限问题
 ```bash
 # 如需访问特殊设备或端口，可能需要管理员权限
-sudo ./FireProtection
+sudo ./fireprotection
 ```
 
 ## 📞 技术支持
