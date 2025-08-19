@@ -115,9 +115,9 @@ function startHLSServer() {
 // 更可靠的开发环境检测
 // 强制生产模式检测，避免误判
 // 只有在明确的开发环境下才为true，避免开机自启动时误判
-const isDev = (process.env.NODE_ENV === 'development' && 
-              !app.isPackaged) || 
-              process.argv.includes('--dev')
+const isDev = (process.env.NODE_ENV === 'development' || 
+              process.env.IS_DEV === 'true') && 
+              !app.isPackaged
 console.log('=== 环境检测详情 ===')
 console.log('NODE_ENV:', process.env.NODE_ENV)
 console.log('isPackaged:', app.isPackaged)
@@ -172,7 +172,7 @@ function createWindow() {
     mainWindow = new BrowserWindow(windowConfig)
 
     const startUrl = isDev
-    ? 'http://localhost:3000'
+    ? 'http://localhost:5173'
     : `file://${path.join(app.getAppPath(), 'dist/index.html')}`
 
     console.log('加载URL:', startUrl)
@@ -601,11 +601,9 @@ app.whenReady().then(async () => {
             showExitDialog()
         })
 
-        // 禁用其他快捷键
-        globalShortcut.register('Alt+F4', () => { })
+        // 禁用其他快捷键（保留Alt+F4和F12）
         globalShortcut.register('F11', () => { })
         globalShortcut.register('Escape', () => { })
-        globalShortcut.register('F12', () => { })
         globalShortcut.register('Ctrl+Shift+I', () => { })
     }
 })

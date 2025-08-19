@@ -29,13 +29,15 @@
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^4.0.0",
+    "concurrently": "^9.2.0",
     "cross-env": "^7.0.3",
     "electron": "^22.0.0",
     "electron-builder": "^23.6.0",
     "sass": "^1.90.0",
     "terser": "^5.43.1",
     "vite": "^4.0.0",
-    "vue": "^3.2.45"
+    "vue": "^3.2.45",
+    "wait-on": "^8.0.4"
   },
   "dependencies": {
     "axios": "^1.11.0",
