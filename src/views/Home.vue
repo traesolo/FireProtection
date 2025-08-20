@@ -2202,7 +2202,9 @@ onMounted(async () => {
 
 
 
-    // // 确保DOM完全渲染后再启动视频流
+    // 注释掉视频流启动 - 根据用户要求暂时禁用监控视频流
+    /*
+    // 确保DOM完全渲染后再启动视频流
     await nextTick()
     // 添加更长的延迟确保DOM元素完全准备好和稳定
     startupTimer = setTimeout(async () => {
@@ -2217,6 +2219,7 @@ onMounted(async () => {
             console.error('启动视频流失败:', error)
         }
     }, 500)
+    */
 })
 
 onUnmounted(async () => {

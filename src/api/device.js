@@ -54,9 +54,9 @@ export const useDeviceStore = defineStore('device', {
             this.fetchMonitorStatus()
 
             // 每1秒轮询一次
-            // this.pollingInterval = setInterval(() => {
-            //     this.fetchMonitorStatus()
-            // }, 1000)
+            this.pollingInterval = setInterval(() => {
+                this.fetchMonitorStatus()
+            }, 1000)
         },
 
         // 停止轮询
