@@ -309,9 +309,9 @@ const devicePriority = {
 
 // 设备类型到视频文件的映射
 const deviceVideoMap = {
-    '灭火器': './static/vid/miehuoqi.mp4',
-    '消防水枪': './static/vid/shuiqiang.mp4',
-    '泡沫喷枪': './static/vid/paomoqiang.mp4'
+    '灭火器': miehuoqiVideo,
+    '消防水枪': shuiqiangVideo,
+    '泡沫喷枪': paomoqiangVideo
 }
 
 // 获取设备类型
@@ -836,6 +836,11 @@ import guanImg from '/static/index/guan.png'
 import imgIcon from '/static/index/img.png'
 import userImg from '/static/index/user.png'
 import passImg from '/static/index/pass.png'
+
+// 导入视频资源
+import miehuoqiVideo from '/static/vid/miehuoqi.mp4'
+import shuiqiangVideo from '/static/vid/shuiqiang.mp4'
+import paomoqiangVideo from '/static/vid/paomoqiang.mp4'
 
 const router = useRouter()
 const deviceStore = useDeviceStore()

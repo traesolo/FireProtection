@@ -42,13 +42,13 @@
             </div>
             <div class="tables">
                 <el-table :data="alarmData" class="alarm-table">
-                    <el-table-column prop="id" label="序号" width="136" />
-                    <el-table-column prop="name" label="设备名称" width="136" />
-                    <el-table-column prop="status" label="报警信息" width="136" />
-                    <el-table-column prop="alarmLevel" label="报警等级" width="136" />
-                    <el-table-column prop="productTime" label="产生时间" width="136" />
-                    <el-table-column prop="endTime" label="结束时间" width="136" />
-                    <el-table-column prop="alarmDate" label="报警日期" width="136" />
+                    <el-table-column prop="id" label="序号" width="136" align="center" />
+                    <el-table-column prop="name" label="设备名称" width="136" align="center" />
+                    <el-table-column prop="status" label="报警信息" width="136" align="center" />
+                    <el-table-column prop="alarmLevel" label="报警等级" width="136" align="center" />
+                    <el-table-column prop="productTime" label="产生时间" width="136" align="center" />
+                    <el-table-column prop="endTime" label="结束时间" width="136" align="center" />
+                    <el-table-column prop="alarmDate" label="报警日期" width="136" align="center" />
                 </el-table>
                 <div class="page">
                     <el-pagination v-model:currentPage="currentPage" v-model:page-size="pageSize" :small="true"
@@ -107,8 +107,8 @@
                         </div>
                         <div class="form-item">
                             <label class="form-label">寄存器地址:</label>
-                            <el-input v-model="settingsForm.registerAddress" placeholder="请输入寄存器地址"
-                                class="form-input" @input="validateNumberInput" />
+                            <el-input v-model="settingsForm.registerAddress" placeholder="请输入寄存器地址" class="form-input"
+                                @input="validateNumberInput" />
                         </div>
                         <div class="form-item">
                             <label class="form-label">水压监测阈值:</label>
@@ -622,20 +622,20 @@ const fetchCustomDeviceInfo = async () => {
             // 从后端获取的icon路径
             const iconPath = response.data.icon || ''
             let displayPath = iconPath
-            
+
             // 如果有图片路径，根据环境处理显示路径
             if (iconPath) {
                 if (process.env.NODE_ENV === 'development') {
                     // 开发环境：使用test.junhekh.cn:8061拼接完整的服务器地址
-                    displayPath = iconPath.startsWith('http') ? iconPath : 
+                    displayPath = iconPath.startsWith('http') ? iconPath :
                         `http://test.junhekh.cn:8061${iconPath}`
                 } else {
                     // 生产环境：使用127.0.0.1:8061拼接完整的服务器地址
-                    displayPath = iconPath.startsWith('http') ? iconPath : 
+                    displayPath = iconPath.startsWith('http') ? iconPath :
                         `http://127.0.0.1:8061${iconPath}`
                 }
             }
-            
+
             settingsForm.value = {
                 ...settingsForm.value,
                 deviceName: response.data.name || '',
@@ -848,11 +848,11 @@ const handleUploadSuccess = (response, file) => {
         // 根据环境处理图片显示路径
         if (process.env.NODE_ENV === 'development') {
             // 开发环境：使用test.junhekh.cn:8061拼接完整的服务器地址
-            settingsForm.value.uploadedImageUrl = response.path.startsWith('http') ? 
+            settingsForm.value.uploadedImageUrl = response.path.startsWith('http') ?
                 response.path : `http://test.junhekh.cn:8061${response.path}`
         } else {
             // 生产环境：使用127.0.0.1:8061拼接完整的服务器地址
-            settingsForm.value.uploadedImageUrl = response.path.startsWith('http') ? 
+            settingsForm.value.uploadedImageUrl = response.path.startsWith('http') ?
                 response.path : `http://127.0.0.1:8061${response.path}`
         }
         // 拼接完整路径用于接口传参
