@@ -28,6 +28,14 @@ jobs:
     - name: Install dependencies
       run: npm ci
     
+    - name: Setup FFmpeg binaries
+      run: |
+        npm run setup:ffmpeg
+        # 确保ARM64 FFmpeg二进制文件存在
+        if [ ! -d "ffmpeg/ffmpeg-7.0.2-arm64-static" ]; then
+          echo "Warning: ARM64 FFmpeg binary not found, build may fail"
+        fi
+    
     - name: Build Linux ARM64 app
       run: npm run electron:build:linux -- --arm64
       env:

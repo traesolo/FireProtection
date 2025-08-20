@@ -28,18 +28,7 @@ function findFFmpegPath() {
     
     console.log('检测FFmpeg路径，平台:', platform, '架构:', arch)
     
-    try {
-        // 优先使用ffmpeg-static包提供的FFmpeg（自动适配架构）
-        const ffmpegStatic = require('ffmpeg-static')
-        if (ffmpegStatic && fs.existsSync(ffmpegStatic)) {
-            console.log('使用ffmpeg-static包:', ffmpegStatic)
-            return ffmpegStatic
-        }
-    } catch (error) {
-        console.warn('ffmpeg-static包不可用，使用备用方案:', error.message)
-    }
-    
-    // 备用方案：使用手动下载的FFmpeg
+    // 使用手动管理的FFmpeg二进制文件（支持跨平台构建）
     const isPackaged = app.isPackaged
     let ffmpegDir
     
@@ -56,8 +45,12 @@ function findFFmpegPath() {
     let ffmpegPath
     
     if (platform === 'win32') {
-        // Windows平台
-        ffmpegPath = path.join(ffmpegDir, 'ffmpeg-7.1.1-essentials_build', 'bin', 'ffmpeg.exe')
+        // Windows平台 - 根据架构选择对应版本
+        if (arch === 'arm64' || arch === 'aarch64') {
+            ffmpegPath = path.join(ffmpegDir, 'ffmpeg-7.1.1-win-arm64', 'bin', 'ffmpeg.exe')
+        } else {
+            ffmpegPath = path.join(ffmpegDir, 'ffmpeg-7.1.1-essentials_build', 'bin', 'ffmpeg.exe')
+        }
     } else if (platform === 'linux') {
         // Linux平台 - 根据架构选择对应版本
         if (arch === 'arm64' || arch === 'aarch64') {
@@ -66,8 +59,12 @@ function findFFmpegPath() {
             ffmpegPath = path.join(ffmpegDir, 'ffmpeg-7.0.2-amd64-static', 'ffmpeg')
         }
     } else if (platform === 'darwin') {
-        // macOS平台
-        ffmpegPath = path.join(ffmpegDir, 'ffmpeg')
+        // macOS平台 - 根据架构选择对应版本
+        if (arch === 'arm64' || arch === 'aarch64') {
+            ffmpegPath = path.join(ffmpegDir, 'ffmpeg-7.0.2-macos-arm64', 'ffmpeg')
+        } else {
+            ffmpegPath = path.join(ffmpegDir, 'ffmpeg-7.0.2-macos-x64', 'ffmpeg')
+        }
     } else {
         console.error('不支持的平台:', platform)
         return null

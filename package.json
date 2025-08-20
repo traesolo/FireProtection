@@ -28,7 +28,8 @@
     "electron:build:mac:arm64": "npm run build && electron-builder --mac --arm64",
     "electron:build:linux:wsl": "wsl npm run build && wsl npx electron-builder --linux",
     "build:linux:remote": "node scripts/build-linux-remote.cjs",
-    "build:linux:docker": "docker build -t fireprotection-builder . && docker run --rm -v \"${PWD}:/workspace\" fireprotection-builder"
+    "build:linux:docker": "docker build -t fireprotection-builder . && docker run --rm -v \"${PWD}:/workspace\" fireprotection-builder",
+    "setup:ffmpeg": "node scripts/download-ffmpeg.cjs"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^4.0.0",
@@ -46,7 +47,6 @@
     "axios": "^1.11.0",
     "element-plus": "^2.10.7",
     "express": "^5.1.0",
-    "ffmpeg-static": "^5.2.0",
     "hls.js": "^1.6.10",
     "html2canvas": "^1.4.1",
     "mqtt": "^5.14.0",
