@@ -42,12 +42,21 @@ function findFFmpegPath() {
     
     console.log('使用备用FFmpeg目录:', ffmpegDir)
     
+    // 检查 ffmpeg 目录是否存在
+    if (!fs.existsSync(ffmpegDir)) {
+        console.error('FFmpeg目录不存在:', ffmpegDir)
+        return null
+    }
+    
     let ffmpegPath
+    let fallbackPaths = []
     
     if (platform === 'win32') {
         // Windows平台 - 根据架构选择对应版本
         if (arch === 'arm64' || arch === 'aarch64') {
             ffmpegPath = path.join(ffmpegDir, 'ffmpeg-7.1.1-win-arm64', 'bin', 'ffmpeg.exe')
+            // ARM64 fallback to x64
+            fallbackPaths.push(path.join(ffmpegDir, 'ffmpeg-7.1.1-essentials_build', 'bin', 'ffmpeg.exe'))
         } else {
             ffmpegPath = path.join(ffmpegDir, 'ffmpeg-7.1.1-essentials_build', 'bin', 'ffmpeg.exe')
         }
@@ -55,6 +64,8 @@ function findFFmpegPath() {
         // Linux平台 - 根据架构选择对应版本
         if (arch === 'arm64' || arch === 'aarch64') {
             ffmpegPath = path.join(ffmpegDir, 'ffmpeg-7.0.2-arm64-static', 'ffmpeg')
+            // ARM64 fallback to amd64 (可能在模拟环境下工作)
+            fallbackPaths.push(path.join(ffmpegDir, 'ffmpeg-7.0.2-amd64-static', 'ffmpeg'))
         } else {
             ffmpegPath = path.join(ffmpegDir, 'ffmpeg-7.0.2-amd64-static', 'ffmpeg')
         }
@@ -62,6 +73,8 @@ function findFFmpegPath() {
         // macOS平台 - 根据架构选择对应版本
         if (arch === 'arm64' || arch === 'aarch64') {
             ffmpegPath = path.join(ffmpegDir, 'ffmpeg-7.0.2-macos-arm64', 'ffmpeg')
+            // ARM64 fallback to x64
+            fallbackPaths.push(path.join(ffmpegDir, 'ffmpeg-7.0.2-macos-x64', 'ffmpeg'))
         } else {
             ffmpegPath = path.join(ffmpegDir, 'ffmpeg-7.0.2-macos-x64', 'ffmpeg')
         }
@@ -70,16 +83,51 @@ function findFFmpegPath() {
         return null
     }
     
-    console.log('备用FFmpeg路径:', ffmpegPath)
+    console.log('首选FFmpeg路径:', ffmpegPath)
     
-    // 检查文件是否存在
+    // 检查首选路径是否存在
     if (fs.existsSync(ffmpegPath)) {
         console.log('FFmpeg找到:', ffmpegPath)
         return ffmpegPath
-    } else {
-        console.error('FFmpeg未找到:', ffmpegPath)
-        return null
     }
+    
+    // 尝试fallback路径
+    for (const fallbackPath of fallbackPaths) {
+        console.log('尝试fallback路径:', fallbackPath)
+        if (fs.existsSync(fallbackPath)) {
+            console.log('使用fallback FFmpeg:', fallbackPath)
+            return fallbackPath
+        }
+    }
+    
+    // 尝试系统PATH中的ffmpeg
+    console.log('尝试系统PATH中的ffmpeg')
+    try {
+        const { execSync } = require('child_process')
+        const systemFFmpeg = platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg'
+        execSync(`${systemFFmpeg} -version`, { stdio: 'ignore' })
+        console.log('使用系统FFmpeg:', systemFFmpeg)
+        return systemFFmpeg
+    } catch (error) {
+        console.log('系统PATH中未找到FFmpeg')
+    }
+    
+    console.error('所有FFmpeg路径都不可用')
+    console.error('请确保已正确安装FFmpeg二进制文件')
+    console.error('可用目录列表:')
+    try {
+        const dirs = fs.readdirSync(ffmpegDir)
+        dirs.forEach(dir => {
+            const dirPath = path.join(ffmpegDir, dir)
+            if (fs.statSync(dirPath).isDirectory()) {
+                console.error(`  - ${dir}`)
+            }
+        })
+    } catch (error) {
+        console.error('无法读取FFmpeg目录:', error.message)
+    }
+    
+    return null
 }
 
 // 初始化HLS目录

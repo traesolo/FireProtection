@@ -716,6 +716,12 @@ const startVideoStream = async (position) => {
                     // 根据错误类型提供更详细的提示
                     if (errorMessage.includes('FFmpeg未找到')) {
                         detailedError = 'FFmpeg程序未安装或路径配置错误，请检查Linux系统环境'
+                    } else if (errorMessage.includes('ENOTDIR') || errorMessage.includes('not a directory')) {
+                        detailedError = 'FFmpeg路径配置错误：目录不存在或路径指向文件而非目录。这通常发生在Linux ARM64构建时FFmpeg二进制文件缺失，请检查构建配置或手动安装对应架构的FFmpeg'
+                    } else if (errorMessage.includes('ENOENT') && errorMessage.includes('spawn')) {
+                        detailedError = 'FFmpeg可执行文件未找到，可能是ARM64架构的FFmpeg二进制文件缺失。请确保已下载并正确配置对应架构的FFmpeg版本'
+                    } else if (errorMessage.includes('spawn') && (errorMessage.includes('ffmpeg') || errorMessage.includes('FFmpeg'))) {
+                        detailedError = 'FFmpeg进程启动失败，可能是二进制文件损坏或权限不足。在Linux ARM64环境下，请确保FFmpeg二进制文件具有执行权限'
                     } else if (errorMessage.includes('RTSP') || errorMessage.includes('rtsp')) {
                         detailedError = '摄像头RTSP连接失败，请检查IP地址、端口和认证信息'
                     } else if (errorMessage.includes('timeout') || errorMessage.includes('超时')) {
@@ -744,8 +750,12 @@ const startVideoStream = async (position) => {
                 // 根据异常类型提供更详细的提示
                 if (errorMessage.includes('Network Error') || errorMessage.includes('网络错误')) {
                     detailedError = '网络连接异常，请检查网络状态和防火墙设置'
+                } else if (errorMessage.includes('ENOTDIR') || errorMessage.includes('not a directory')) {
+                    detailedError = 'FFmpeg路径配置错误：目录不存在或路径指向文件而非目录。这通常发生在Linux ARM64构建时FFmpeg二进制文件缺失，请检查构建配置或手动安装对应架构的FFmpeg'
                 } else if (errorMessage.includes('spawn') && errorMessage.includes('ENOENT')) {
-                    detailedError = 'FFmpeg程序未找到，请确保已正确安装FFmpeg'
+                    detailedError = 'FFmpeg可执行文件未找到，可能是ARM64架构的FFmpeg二进制文件缺失。请确保已下载并正确配置对应架构的FFmpeg版本'
+                } else if (errorMessage.includes('spawn') && (errorMessage.includes('ffmpeg') || errorMessage.includes('FFmpeg'))) {
+                    detailedError = 'FFmpeg进程启动失败，可能是二进制文件损坏或权限不足。在Linux ARM64环境下，请确保FFmpeg二进制文件具有执行权限'
                 } else if (errorMessage.includes('ECONNREFUSED')) {
                     detailedError = '连接被拒绝，请检查摄像头IP地址和端口设置'
                 } else if (errorMessage.includes('ETIMEDOUT')) {
