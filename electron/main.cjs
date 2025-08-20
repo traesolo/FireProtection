@@ -391,10 +391,6 @@ ipcMain.handle('save-screenshot', async (event, dataURL, defaultName) => {
 
 app.whenReady().then(async () => {
     try {
-        // 初始化HLS目录和服务器
-        initHLSDirectory()
-        startHLSServer()
-        
         // 创建主窗口
         createWindow()
         
