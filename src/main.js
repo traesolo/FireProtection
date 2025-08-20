@@ -8,6 +8,11 @@ import router from './router'
 import 'element-plus/dist/index.css'
 import ElementPlus from 'element-plus'
 import zhCn from 'element-plus/dist/locale/zh-cn.mjs'
+
+// Linux ARM64 输入框修复样式
+if (navigator.userAgent.includes('Linux') && (navigator.userAgent.includes('aarch64') || navigator.userAgent.includes('arm64'))) {
+    import('./assets/linux-arm64-fix.css')
+}
 const app = createApp(App)
 const pinia = createPinia()
 

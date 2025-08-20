@@ -231,7 +231,13 @@ function createWindow() {
             backgroundThrottling: false, // 禁用后台节流
             nodeIntegrationInWorker: false, // 禁用Worker中的Node集成
             nodeIntegrationInSubFrames: false, // 禁用子框架中的Node集成
-            spellcheck: false // 禁用拼写检查
+            spellcheck: false, // 禁用拼写检查
+            // Linux ARM64 输入兼容性配置
+            enableRemoteModule: false, // 确保远程模块被禁用
+            experimentalFeatures: false, // 禁用实验性功能
+            navigateOnDragDrop: false, // 禁用拖拽导航
+            disableBlinkFeatures: 'Auxclick', // 禁用可能干扰输入的Blink特性
+            enableBlinkFeatures: 'CSSColorSchemeUARendering' // 启用必要的渲染特性
         },
         show: false
     }
@@ -266,6 +272,105 @@ function createWindow() {
 
     mainWindow.webContents.on('dom-ready', () => {
         console.log('DOM加载完成')
+        
+        // Linux ARM64 输入兼容性：注入键盘事件处理代码
+        if (process.platform === 'linux') {
+            mainWindow.webContents.executeJavaScript(`
+                // 防止Alt键激活菜单导致输入框失焦
+                document.addEventListener('keydown', function(event) {
+                    if (event.altKey && (event.key === 'Shift' || event.key === 'Control')) {
+                        event.preventDefault();
+                        event.stopPropagation();
+                    }
+                }, true);
+                
+                // 确保Element Plus输入框能正确接收键盘事件
+                document.addEventListener('DOMContentLoaded', function() {
+                    // 监听所有Element Plus组件
+                    const observer = new MutationObserver(function(mutations) {
+                        mutations.forEach(function(mutation) {
+                            mutation.addedNodes.forEach(function(node) {
+                                if (node.nodeType === 1) {
+                                    // 修复输入框
+                                    const inputs = node.querySelectorAll ? node.querySelectorAll('.el-input__inner') : [];
+                                    inputs.forEach(function(input) {
+                                        input.setAttribute('tabindex', '0');
+                                        input.style.pointerEvents = 'auto';
+                                        input.style.userSelect = 'text';
+                                    });
+                                    
+                                    // 修复选择器
+                                    const selects = node.querySelectorAll ? node.querySelectorAll('.el-select') : [];
+                                    selects.forEach(function(select) {
+                                        select.style.pointerEvents = 'auto';
+                                        const wrapper = select.querySelector('.el-select__wrapper');
+                                        if (wrapper) {
+                                            wrapper.style.pointerEvents = 'auto';
+                                            wrapper.style.cursor = 'pointer';
+                                        }
+                                    });
+                                    
+                                    // 修复按钮
+                                    const buttons = node.querySelectorAll ? node.querySelectorAll('button, .el-button') : [];
+                                    buttons.forEach(function(button) {
+                                        button.style.pointerEvents = 'auto';
+                                        button.style.cursor = 'pointer';
+                                    });
+                                    
+                                    // 修复表格
+                                    const tables = node.querySelectorAll ? node.querySelectorAll('.el-table') : [];
+                                    tables.forEach(function(table) {
+                                        table.style.pointerEvents = 'auto';
+                                    });
+                                    
+                                    // 修复上传组件
+                                    const uploads = node.querySelectorAll ? node.querySelectorAll('.el-upload') : [];
+                                    uploads.forEach(function(upload) {
+                                        upload.style.pointerEvents = 'auto';
+                                    });
+                                }
+                            });
+                        });
+                    });
+                    observer.observe(document.body, { childList: true, subtree: true });
+                    
+                    // 立即处理已存在的组件
+                    setTimeout(function() {
+                        // 处理输入框
+                        const existingInputs = document.querySelectorAll('.el-input__inner');
+                        existingInputs.forEach(function(input) {
+                            input.setAttribute('tabindex', '0');
+                            input.style.pointerEvents = 'auto';
+                            input.style.userSelect = 'text';
+                        });
+                        
+                        // 处理选择器
+                        const existingSelects = document.querySelectorAll('.el-select');
+                        existingSelects.forEach(function(select) {
+                            select.style.pointerEvents = 'auto';
+                            const wrapper = select.querySelector('.el-select__wrapper');
+                            if (wrapper) {
+                                wrapper.style.pointerEvents = 'auto';
+                                wrapper.style.cursor = 'pointer';
+                            }
+                        });
+                        
+                        // 处理按钮
+                        const existingButtons = document.querySelectorAll('button, .el-button');
+                        existingButtons.forEach(function(button) {
+                            button.style.pointerEvents = 'auto';
+                            button.style.cursor = 'pointer';
+                        });
+                        
+                        // 处理其他交互元素
+                        const interactiveElements = document.querySelectorAll('[role="button"], [tabindex]');
+                        interactiveElements.forEach(function(element) {
+                            element.style.pointerEvents = 'auto';
+                        });
+                    }, 1000);
+                });
+            `);
+        }
     })
 
     // 开发模式显示菜单栏

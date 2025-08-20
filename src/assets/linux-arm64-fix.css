@@ -1,0 +1,195 @@
+/* Linux ARM64 Element Plus 输入框修复样式 */
+
+/* 确保所有Element Plus输入框能正常接收输入 */
+.el-input__inner {
+  pointer-events: auto !important;
+  user-select: text !important;
+  -webkit-user-select: text !important;
+  -moz-user-select: text !important;
+  -ms-user-select: text !important;
+  cursor: text !important;
+  outline: none;
+  border: 1px solid #dcdfe6;
+  transition: border-color 0.2s cubic-bezier(0.645, 0.045, 0.355, 1);
+}
+
+/* 输入框获得焦点时的样式 */
+.el-input__inner:focus {
+  border-color: #409eff !important;
+  outline: none !important;
+  box-shadow: 0 0 0 2px rgba(64, 158, 255, 0.2) !important;
+}
+
+/* 确保输入框容器不会阻止事件 */
+.el-input {
+  pointer-events: auto !important;
+  position: relative;
+}
+
+/* 修复可能的z-index问题 */
+.el-input__inner {
+  z-index: 1;
+  position: relative;
+}
+
+/* 确保表单项不会阻止输入 */
+.el-form-item__content {
+  pointer-events: auto !important;
+}
+
+/* 修复可能的输入法问题 */
+.el-input__inner {
+  ime-mode: auto;
+  -webkit-ime-mode: auto;
+}
+
+/* 确保禁用状态下的输入框样式正确 */
+.el-input.is-disabled .el-input__inner {
+  background-color: #f5f7fa;
+  border-color: #e4e7ed;
+  color: #c0c4cc;
+  cursor: not-allowed;
+  pointer-events: none !important;
+}
+
+/* 修复Linux下可能的字体渲染问题 */
+.el-input__inner {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* 确保输入框在不同状态下都能正常工作 */
+.el-input__inner[readonly] {
+  pointer-events: auto !important;
+  cursor: text !important;
+}
+
+/* 修复可能的层级问题 */
+.el-dialog .el-input__inner,
+.el-drawer .el-input__inner,
+.el-popover .el-input__inner {
+  z-index: auto;
+  position: relative;
+}
+
+/* 确保输入框在弹窗中也能正常工作 */
+.el-overlay .el-input__inner {
+  pointer-events: auto !important;
+  user-select: text !important;
+}
+
+/* Element Plus 选择器修复 */
+.el-select {
+  pointer-events: auto !important;
+}
+
+.el-select__wrapper {
+  pointer-events: auto !important;
+  cursor: pointer !important;
+}
+
+.el-select__input {
+  pointer-events: auto !important;
+  cursor: pointer !important;
+}
+
+.el-select__suffix {
+  pointer-events: auto !important;
+}
+
+/* Element Plus 表格修复 */
+.el-table {
+  pointer-events: auto !important;
+}
+
+.el-table__cell {
+  pointer-events: auto !important;
+}
+
+/* Element Plus 分页修复 */
+.el-pagination {
+  pointer-events: auto !important;
+}
+
+.el-pagination button {
+  pointer-events: auto !important;
+  cursor: pointer !important;
+}
+
+.el-pagination .el-input__inner {
+  pointer-events: auto !important;
+  cursor: text !important;
+}
+
+/* Element Plus 弹窗修复 */
+.el-dialog {
+  pointer-events: auto !important;
+}
+
+.el-dialog__wrapper {
+  pointer-events: auto !important;
+}
+
+.el-dialog__body {
+  pointer-events: auto !important;
+}
+
+/* Element Plus 表单修复 */
+.el-form {
+  pointer-events: auto !important;
+}
+
+.el-form-item {
+  pointer-events: auto !important;
+}
+
+/* Element Plus 上传组件修复 */
+.el-upload {
+  pointer-events: auto !important;
+}
+
+.el-upload__input {
+  pointer-events: auto !important;
+}
+
+.el-upload-dragger {
+  pointer-events: auto !important;
+  cursor: pointer !important;
+}
+
+/* Element Plus 下拉选项修复 */
+.el-select-dropdown {
+  pointer-events: auto !important;
+}
+
+.el-select-dropdown__item {
+  pointer-events: auto !important;
+  cursor: pointer !important;
+}
+
+/* Element Plus 滚动条修复 */
+.el-scrollbar {
+  pointer-events: auto !important;
+}
+
+.el-scrollbar__wrap {
+  pointer-events: auto !important;
+}
+
+/* 确保所有可交互元素在Linux ARM64下正常工作 */
+button, input, select, textarea, [role="button"], [tabindex] {
+  pointer-events: auto !important;
+}
+
+/* 修复可能的焦点问题 */
+*:focus {
+  outline: none !important;
+}
+
+.el-input__inner:focus,
+.el-select__wrapper:focus,
+.el-textarea__inner:focus {
+  outline: none !important;
+  box-shadow: 0 0 0 2px rgba(64, 158, 255, 0.2) !important;
+}
