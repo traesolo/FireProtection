@@ -1,0 +1,45 @@
+name: Build Windows ARM64 App
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build-windows-arm64:
+    runs-on: windows-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: Build Windows ARM64 app
+      run: npm run electron:build:win:arm64
+      env:
+        # Force ARM64 build
+        npm_config_target_arch: arm64
+        npm_config_target_platform: win32
+        npm_config_arch: arm64
+        npm_config_cache: ${{ runner.temp }}\.npm
+        npm_config_build_from_source: true
+        ELECTRON_CACHE: ${{ runner.temp }}\.electron
+        ELECTRON_BUILDER_CACHE: ${{ runner.temp }}\.electron-builder
+    
+    - name: Upload ARM64 artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: windows-arm64-app-${{ github.sha }}
+        path: |
+          dist-electron/*arm64*.exe
+          dist-electron/*arm64*.zip
+        retention-days: 30

@@ -58,7 +58,7 @@ export class VideoStreamManager {
             } else {
                 // 浏览器环境：使用模拟视频流
                 const mockHlsUrl = `http://localhost:8080/hls/${config.id}.m3u8`
-                
+
                 try {
                     this.createMockVideoStream(config)
                     this.streams.set(config.id, {
@@ -176,7 +176,7 @@ export class VideoStreamManager {
      */
     createMockVideoStream(config) {
         // 开始创建模拟视频流
-        
+
         // 添加重试机制，确保DOM元素存在
         const findContainer = () => {
             return document.getElementById(config.containerId)
@@ -214,8 +214,8 @@ export class VideoStreamManager {
             const videoWrapper = document.createElement('div')
             videoWrapper.className = 'video-stream-wrapper'
             videoWrapper.style.cssText = `
-            width: 486px;
-            height: 277px;
+            width: 484px;
+            height: 275px;
             background: linear-gradient(45deg, #1a1a2e, #16213e);
             position: relative;
             overflow: hidden;

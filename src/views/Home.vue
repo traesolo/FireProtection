@@ -26,8 +26,10 @@
                     <div class="monitor-content">
                         <!-- 监控显示区域 -->
                         <div class="monitor-display" id="monitor-left">
-                            <video v-if="safeVideoStreams.left.active" key="left-video" autoplay muted playsinline
-                                style="width: 100%; height: 100%; object-fit: cover;"
+                            <video v-if="safeVideoStreams.left.active" key="left-video" autoplay playsinline
+                                style="width: 484px; height: 275px; object-fit: cover;"
+                                :src="safeVideoStreams.left.isPlayingVideo ? safeVideoStreams.left.videoUrl : undefined"
+                                :volume="1.0"
                                 @error="handleVideoError('left', $event)"></video>
                             <div v-else-if="safeVideoStreams.left.loading" key="left-loading"
                                 class="monitor-placeholder">
@@ -45,8 +47,10 @@
                     <div class="monitor-content">
                         <!-- 监控显示区域 -->
                         <div class="monitor-display" id="monitor-right">
-                            <video v-if="safeVideoStreams.right.active" key="right-video" autoplay muted playsinline
-                                style="width: 100%; height: 100%; object-fit: cover;"
+                            <video v-if="safeVideoStreams.right.active" key="right-video" autoplay playsinline
+                                style="width: 484px; height: 275px; object-fit: cover;"
+                                :src="safeVideoStreams.right.isPlayingVideo ? safeVideoStreams.right.videoUrl : undefined"
+                                :volume="1.0"
                                 @error="handleVideoError('right', $event)"></video>
                             <div v-else-if="safeVideoStreams.right.loading" key="right-loading"
                                 class="monitor-placeholder">正在连接摄像头...</div>
@@ -188,8 +192,8 @@
                         </div>
                         <div class="form-item">
                             <label class="form-label">寄存器地址:</label>
-                            <el-input v-model="settingsForm.registerAddress" placeholder="请输入寄存器地址"
-                                class="form-input" @input="validateNumberInput('registerAddress', $event)" />
+                            <el-input v-model="settingsForm.registerAddress" placeholder="请输入寄存器地址" class="form-input"
+                                @input="validateNumberInput('registerAddress', $event)" />
                         </div>
                         <div class="form-item">
                             <label class="form-label">上传图片:</label>
@@ -276,20 +280,347 @@ const videoStreams = ref({
         loading: false,
         error: null,
         hlsUrl: null,
-        hlsInstance: null
+        hlsInstance: null,
+        isPlayingVideo: false,
+        videoUrl: null
     },
     right: {
         active: false,
         loading: false,
         error: null,
         hlsUrl: null,
-        hlsInstance: null
+        hlsInstance: null,
+        isPlayingVideo: false,
+        videoUrl: null
     }
 })
 
+// 视频播放队列管理
+const videoPlayQueue = ref([])
+const currentPlayingVideos = ref({
+    left: null,  // 当前左侧播放的视频信息
+    right: null  // 当前右侧播放的视频信息
+})
+
+// 设备类型优先级映射
+const devicePriority = {
+    '灭火器': 1,
+    '消防水枪': 2,
+    '泡沫喷枪': 3
+}
+
+// 设备类型到视频文件的映射
+const deviceVideoMap = {
+    '灭火器': './static/vid/miehuoqi.mp4',
+    '消防水枪': './static/vid/shuiqiang.mp4',
+    '泡沫喷枪': './static/vid/paomoqiang.mp4'
+}
+
+// 获取设备类型
+const getDeviceType = (deviceName) => {
+    if (deviceName.includes('灭火器')) return '灭火器'
+    if (deviceName.includes('消防水枪') || deviceName.includes('水带')) return '消防水枪'
+    if (deviceName.includes('泡沫喷枪')) return '泡沫喷枪'
+    return null
+}
+
+// 添加视频到播放队列
+const addToVideoQueue = (device) => {
+    const deviceType = getDeviceType(device.name)
+    if (!deviceType) return
+
+    const videoInfo = {
+        id: device.id,
+        name: device.name,
+        type: deviceType,
+        videoUrl: deviceVideoMap[deviceType],
+        priority: devicePriority[deviceType],
+        timestamp: Date.now()
+    }
+
+    // 检查是否已在队列中
+    const existingIndex = videoPlayQueue.value.findIndex(item => item.id === device.id)
+    if (existingIndex === -1) {
+        videoPlayQueue.value.push(videoInfo)
+        // 按优先级排序，优先级数字越小越优先
+        videoPlayQueue.value.sort((a, b) => a.priority - b.priority)
+        console.log('📝 添加视频到队列:', videoInfo.name, '优先级:', videoInfo.priority)
+        console.log('📋 当前队列长度:', videoPlayQueue.value.length)
+
+        // 延迟处理队列，避免并发问题
+        nextTick(() => {
+            processVideoQueue()
+        })
+    } else {
+        console.log('⚠️ 设备已在队列中，跳过添加:', device.name)
+    }
+}
+
+// 从队列中移除视频
+const removeFromVideoQueue = (deviceId) => {
+    const index = videoPlayQueue.value.findIndex(item => item.id === deviceId)
+    if (index !== -1) {
+        videoPlayQueue.value.splice(index, 1)
+        console.log('从队列移除视频:', deviceId)
+    }
+}
+
+// 处理视频播放队列
+const processVideoQueue = () => {
+    if (isUnmounted.value) return
+
+    console.log('🔄 处理视频队列，当前队列长度:', videoPlayQueue.value.length)
+    console.log('📺 当前播放状态 - 左侧:', currentPlayingVideos.value.left?.name || '空闲', '右侧:', currentPlayingVideos.value.right?.name || '空闲')
+
+    // 如果队列为空，直接返回
+    if (videoPlayQueue.value.length === 0) {
+        console.log('📋 队列为空，无需处理')
+        return
+    }
+
+    // 检查左侧区域是否可以播放新视频
+    if (!currentPlayingVideos.value.left && videoPlayQueue.value.length > 0) {
+        const nextVideo = videoPlayQueue.value.shift()
+        console.log('▶️ 左侧区域开始播放:', nextVideo.name)
+        playVideoInArea('left', nextVideo)
+    }
+    // 检查右侧区域是否可以播放新视频
+    else if (!currentPlayingVideos.value.right && videoPlayQueue.value.length > 0) {
+        const nextVideo = videoPlayQueue.value.shift()
+        console.log('▶️ 右侧区域开始播放:', nextVideo.name)
+        playVideoInArea('right', nextVideo)
+    }
+    else {
+        console.log('⏸️ 两个区域都在播放中，等待播放完成')
+    }
+}
+
+// 在指定区域播放视频
+const playVideoInArea = async (position, videoInfo) => {
+    if (isUnmounted.value) return
+
+    // 检查该区域是否已经在播放视频
+    if (currentPlayingVideos.value[position]) {
+        console.warn(`⚠️ ${position}区域已在播放视频: ${currentPlayingVideos.value[position].name}，跳过新视频: ${videoInfo.name}`)
+        // 将视频重新加入队列头部，等待下次处理
+        videoPlayQueue.value.unshift(videoInfo)
+        return
+    }
+
+    try {
+        console.log(`🎬 开始在${position}区域播放视频: ${videoInfo.name} -> ${videoInfo.videoUrl}`)
+
+        // 立即标记该区域为播放状态，防止并发
+        currentPlayingVideos.value[position] = videoInfo
+
+        // 停止当前区域的监控流
+        await stopVideoStream(position)
+
+        // 设置视频播放状态
+        if (videoStreams.value && videoStreams.value[position]) {
+            videoStreams.value[position].isPlayingVideo = true
+            videoStreams.value[position].videoUrl = videoInfo.videoUrl
+            videoStreams.value[position].active = true
+            videoStreams.value[position].loading = false
+            videoStreams.value[position].error = null
+        }
+
+        // currentPlayingVideos已在函数开头设置，这里不需要重复设置
+
+        // 等待DOM更新
+        await nextTick()
+        await new Promise(resolve => setTimeout(resolve, 200))
+
+        // 检查组件是否已卸载
+        if (isUnmounted.value) return
+
+        // 获取视频元素并开始播放
+        const containerElement = document.querySelector(`#monitor-${position}`)
+        if (!containerElement) {
+            console.error(`❌ 未找到${position}区域容器元素`)
+            onVideoError(position, videoInfo)
+            return
+        }
+
+        const videoElement = containerElement.querySelector('video')
+        if (!videoElement) {
+            console.error(`❌ 未找到${position}区域视频元素`)
+            onVideoError(position, videoInfo)
+            return
+        }
+
+        // 清除之前的事件监听器
+        videoElement.onended = null
+        videoElement.onerror = null
+        videoElement.onloadstart = null
+
+        // 停止当前播放（如果有）
+        if (!videoElement.paused) {
+            videoElement.pause()
+        }
+
+        // 设置视频属性
+        videoElement.style.width = '484px'
+        videoElement.style.height = '275px'
+        videoElement.style.objectFit = 'cover'
+        videoElement.style.position = 'absolute'
+        videoElement.style.top = '50%'
+        videoElement.style.left = '50%'
+        videoElement.style.transform = 'translate(-50%, -50%)'
+        videoElement.preload = 'metadata'
+        videoElement.muted = false
+        videoElement.volume = 1.0
+
+        // 设置事件监听器
+        videoElement.onended = () => {
+            if (isUnmounted.value) return
+            console.log(`✅ ${position}区域视频播放完成: ${videoInfo.name}`)
+            onVideoEnded(position)
+        }
+
+        videoElement.onerror = (error) => {
+            if (isUnmounted.value) return
+            console.error(`❌ ${position}区域视频播放错误:`, error)
+            onVideoError(position, videoInfo)
+        }
+
+        // 加载视频
+        videoElement.src = videoInfo.videoUrl
+        videoElement.load()
+
+        // 等待视频加载完成后播放
+        await new Promise((resolve, reject) => {
+            const timeout = setTimeout(() => {
+                reject(new Error('视频加载超时'))
+            }, 5000)
+
+            videoElement.oncanplay = () => {
+                clearTimeout(timeout)
+                resolve()
+            }
+
+            videoElement.onerror = (error) => {
+                clearTimeout(timeout)
+                reject(error)
+            }
+        })
+
+        // 检查组件是否已卸载
+        if (isUnmounted.value) return
+
+        // 播放视频
+        await videoElement.play()
+        console.log(`✅ ${position}区域视频开始播放`)
+
+    } catch (error) {
+        if (isUnmounted.value) return
+        console.error(`❌ ${position}区域播放视频失败:`, error)
+
+        // 清理状态，因为播放失败
+        currentPlayingVideos.value[position] = null
+
+        onVideoError(position, videoInfo)
+    }
+}
+
+// 视频播放结束处理
+const onVideoEnded = (position) => {
+    if (isUnmounted.value) return
+
+    console.log(`${position}区域视频播放结束`)
+
+    // 清除当前播放的视频记录
+    currentPlayingVideos.value[position] = null
+
+    // 重置视频播放状态
+    if (videoStreams.value && videoStreams.value[position]) {
+        videoStreams.value[position].isPlayingVideo = false
+        videoStreams.value[position].videoUrl = null
+    }
+
+    // 检查队列中是否还有视频要播放
+    if (videoPlayQueue.value.length > 0) {
+        processVideoQueue()
+    } else {
+        // 没有视频要播放，恢复监控流
+        restoreMonitorStream(position)
+    }
+}
+
+// 视频播放错误处理
+const onVideoError = (position, videoInfo) => {
+    if (isUnmounted.value) return
+
+    console.error(`❌ ${position}区域视频播放错误:`, videoInfo?.name || '未知视频')
+    console.log(`🧹 清理${position}区域播放状态`)
+
+    // 清除当前播放的视频记录
+    currentPlayingVideos.value[position] = null
+
+    // 重置视频播放状态
+    if (videoStreams.value && videoStreams.value[position]) {
+        videoStreams.value[position].isPlayingVideo = false
+        videoStreams.value[position].videoUrl = null
+        videoStreams.value[position].error = null // 清除错误状态
+        videoStreams.value[position].loading = false
+    }
+
+    // 清理视频元素状态
+    try {
+        const containerElement = document.querySelector(`#monitor-${position}`)
+        if (containerElement) {
+            const videoElement = containerElement.querySelector('video')
+            if (videoElement) {
+                videoElement.pause()
+                videoElement.src = ''
+                videoElement.load()
+                // 清除事件监听器
+                videoElement.onended = null
+                videoElement.onerror = null
+                videoElement.oncanplay = null
+            }
+        }
+    } catch (error) {
+        console.warn(`清理${position}区域视频元素时出错:`, error)
+    }
+
+    // 延迟处理队列，避免立即重试导致的问题
+    setTimeout(() => {
+        if (isUnmounted.value) return
+
+        console.log(`🔄 ${position}区域错误处理完成，检查队列`)
+        // 继续处理队列或恢复监控
+        if (videoPlayQueue.value.length > 0) {
+            console.log(`📋 队列中还有${videoPlayQueue.value.length}个视频，继续处理`)
+            processVideoQueue()
+        } else {
+            console.log(`📺 恢复${position}区域监控流`)
+            restoreMonitorStream(position)
+        }
+    }, 500) // 延迟500ms处理
+}
+
+// 恢复监控流
+const restoreMonitorStream = async (position) => {
+    if (isUnmounted.value) return
+
+    console.log(`恢复${position}区域监控流`)
+
+    // 重置状态
+    if (videoStreams.value && videoStreams.value[position]) {
+        videoStreams.value[position].isPlayingVideo = false
+        videoStreams.value[position].videoUrl = null
+        videoStreams.value[position].active = false
+        videoStreams.value[position].error = null
+    }
+
+    // 重新启动监控流
+    await startVideoStream(position)
+}
+
 // 安全的视频流状态访问器
 const safeVideoStreams = computed(() => {
-    const defaultStream = { active: false, loading: false, error: null, hlsUrl: null, hlsInstance: null }
+    const defaultStream = { active: false, loading: false, error: null, hlsUrl: null, hlsInstance: null, isPlayingVideo: false, videoUrl: null }
 
     if (isUnmounted.value || !videoStreams.value) {
         return {
@@ -306,14 +637,18 @@ const safeVideoStreams = computed(() => {
             loading: streams.left?.loading || false,
             error: streams.left?.error || null,
             hlsUrl: streams.left?.hlsUrl || null,
-            hlsInstance: streams.left?.hlsInstance || null
+            hlsInstance: streams.left?.hlsInstance || null,
+            isPlayingVideo: streams.left?.isPlayingVideo || false,
+            videoUrl: streams.left?.videoUrl || null
         },
         right: {
             active: streams.right?.active || false,
             loading: streams.right?.loading || false,
             error: streams.right?.error || null,
             hlsUrl: streams.right?.hlsUrl || null,
-            hlsInstance: streams.right?.hlsInstance || null
+            hlsInstance: streams.right?.hlsInstance || null,
+            isPlayingVideo: streams.right?.isPlayingVideo || false,
+            videoUrl: streams.right?.videoUrl || null
         }
     }
 })
@@ -376,7 +711,7 @@ const startVideoStream = async (position) => {
                 if (!isUnmounted.value && videoStreams.value && videoStreams.value[position]) {
                     // 从videoStreamManager返回的错误信息在message字段中
                     let errorMessage = result.message || result.error || '启动失败'
-                    
+
                     let detailedError = errorMessage
                     // 根据错误类型提供更详细的提示
                     if (errorMessage.includes('FFmpeg未找到')) {
@@ -392,7 +727,7 @@ const startVideoStream = async (position) => {
                     } else if (errorMessage.includes('No route to host') || errorMessage.includes('无法到达主机')) {
                         detailedError = '网络不可达，请检查IP地址和网络连接'
                     }
-                    
+
                     videoStreams.value[position].error = detailedError
                 }
             } catch (reactiveError) {
@@ -405,7 +740,7 @@ const startVideoStream = async (position) => {
             if (!isUnmounted.value && videoStreams && videoStreams.value && videoStreams.value[position]) {
                 let errorMessage = error.message || '连接异常'
                 let detailedError = errorMessage
-                
+
                 // 根据异常类型提供更详细的提示
                 if (errorMessage.includes('Network Error') || errorMessage.includes('网络错误')) {
                     detailedError = '网络连接异常，请检查网络状态和防火墙设置'
@@ -418,7 +753,7 @@ const startVideoStream = async (position) => {
                 } else if (errorMessage.includes('EHOSTUNREACH')) {
                     detailedError = '主机不可达，请检查IP地址和网络路由'
                 }
-                
+
                 videoStreams.value[position].error = detailedError
             }
         } catch (reactiveError) {
@@ -756,7 +1091,7 @@ const fetchCustomDeviceInfo = async () => {
             // 从后端获取的icon路径
             const iconPath = response.data.icon || ''
             let displayPath = iconPath
-            
+
             // 如果有图片路径，根据环境处理显示路径
             if (iconPath) {
                 if (process.env.NODE_ENV === 'development') {
@@ -764,11 +1099,11 @@ const fetchCustomDeviceInfo = async () => {
                     displayPath = iconPath
                 } else {
                     // 生产环境：使用127.0.0.1:8061拼接完整的服务器地址
-                    displayPath = iconPath.startsWith('http') ? iconPath : 
+                    displayPath = iconPath.startsWith('http') ? iconPath :
                         `http://127.0.0.1:8061${iconPath}`
                 }
             }
-            
+
             settingsForm.value = {
                 ...settingsForm.value,
                 deviceName: response.data.name || '',
@@ -864,17 +1199,17 @@ const playFallbackBeep = (frequency) => {
         const audioContext = new (window.AudioContext || window.webkitAudioContext)()
         const oscillator = audioContext.createOscillator()
         const gainNode = audioContext.createGain()
-        
+
         oscillator.frequency.setValueAtTime(frequency, audioContext.currentTime)
         oscillator.type = 'square'
         gainNode.gain.setValueAtTime(0.1, audioContext.currentTime)
-        
+
         oscillator.connect(gainNode)
         gainNode.connect(audioContext.destination)
-        
+
         oscillator.start()
         oscillator.stop(audioContext.currentTime + 0.1)
-        
+
         console.log(`备用蜂鸣器播放: ${frequency}Hz`)
     } catch (error) {
         console.error('备用蜂鸣器也失败:', error)
@@ -897,7 +1232,7 @@ const createBeepSound = async () => {
 
         // 创建音频上下文
         alarmState.value.audioContext = new (window.AudioContext || window.webkitAudioContext)()
-        
+
         // 检查音频上下文状态，如果是suspended需要恢复
         if (alarmState.value.audioContext.state === 'suspended') {
             await alarmState.value.audioContext.resume()
@@ -941,7 +1276,7 @@ const createWarningBeepSound = async () => {
 
         // 创建音频上下文
         alarmState.value.warningAudioContext = new (window.AudioContext || window.webkitAudioContext)()
-        
+
         // 检查音频上下文状态，如果是suspended需要恢复
         if (alarmState.value.warningAudioContext.state === 'suspended') {
             await alarmState.value.warningAudioContext.resume()
@@ -1394,7 +1729,10 @@ const updateDeviceGroups = () => {
         const devices = deviceStore.devices.map(device => {
             if (!device) return null
             const statusInfo = getDeviceStatus(device.currentStatus, device.name)
-            
+
+            // 检查设备状态变化，触发视频播放
+            checkDeviceStatusForVideo(device)
+
             // 处理设备图标 - 优先使用API返回的icon字段
             let deviceIcon = miehuoImg // 默认图标
             if (device.icon) {
@@ -1410,7 +1748,7 @@ const updateDeviceGroups = () => {
                 // 如果API没有返回icon字段，使用代码中定义的映射
                 deviceIcon = deviceIconMap[device.id] || miehuoImg
             }
-            
+
             return {
                 id: device.id,
                 name: device.name || '',
@@ -1438,6 +1776,25 @@ const updateDeviceGroups = () => {
         console.warn('更新设备分组时发生错误:', error)
     }
 }
+
+// 检查设备状态变化，触发视频播放
+const checkDeviceStatusForVideo = (device) => {
+    if (isUnmounted.value || !device) return
+
+    const deviceType = getDeviceType(device.name)
+    if (!deviceType) return
+
+    // 检查设备状态是否为IN_USE
+    if (device.currentStatus === 'IN_USE') {
+        console.log(`检测到设备${device.name}状态为IN_USE，准备播放视频`)
+        addToVideoQueue(device)
+    } else {
+        // 如果设备状态不是IN_USE，从队列中移除
+        removeFromVideoQueue(device.id)
+    }
+}
+
+
 
 // 告警数据 - 使用计算属性从deviceStore获取
 const alarmData = computed(() => {
@@ -1663,11 +2020,11 @@ const handleUploadSuccess = (response, file) => {
         // 根据环境处理图片显示路径
         if (process.env.NODE_ENV === 'development') {
             // 开发环境：使用test.junhekh.cn:8061拼接完整的服务器地址
-            settingsForm.value.uploadedImageUrl = response.path.startsWith('http') ? 
+            settingsForm.value.uploadedImageUrl = response.path.startsWith('http') ?
                 response.path : `http://test.junhekh.cn:8061${response.path}`
         } else {
             // 生产环境：使用127.0.0.1:8061拼接完整的服务器地址
-            settingsForm.value.uploadedImageUrl = response.path.startsWith('http') ? 
+            settingsForm.value.uploadedImageUrl = response.path.startsWith('http') ?
                 response.path : `http://127.0.0.1:8061${response.path}`
         }
         // 拼接完整路径用于接口传参
@@ -1811,6 +2168,12 @@ onMounted(async () => {
         updateDeviceGroups()
         // 检查报警状态
         checkAlarmStatus()
+        // 检查设备状态变化，触发视频播放
+        if (deviceStore.devices && Array.isArray(deviceStore.devices)) {
+            deviceStore.devices.forEach(device => {
+                checkDeviceStatusForVideo(device)
+            })
+        }
     })
 
     // 初始化数据
@@ -1822,21 +2185,23 @@ onMounted(async () => {
     // 初始检查报警状态
     checkAlarmStatus()
 
-    // 确保DOM完全渲染后再启动视频流
-    await nextTick()
-    // 添加更长的延迟确保DOM元素完全准备好和稳定
-    startupTimer = setTimeout(async () => {
-        if (isUnmounted.value) {
-            console.log('组件已卸载，跳过视频流启动')
-            return
-        }
-        try {
-            console.log('开始启动视频流，DOM应该已经完全准备好')
-            await startAllVideoStreams()
-        } catch (error) {
-            console.error('启动视频流失败:', error)
-        }
-    }, 500)
+
+
+    // // 确保DOM完全渲染后再启动视频流
+    // await nextTick()
+    // // 添加更长的延迟确保DOM元素完全准备好和稳定
+    // startupTimer = setTimeout(async () => {
+    //     if (isUnmounted.value) {
+    //         console.log('组件已卸载，跳过视频流启动')
+    //         return
+    //     }
+    //     try {
+    //         console.log('开始启动视频流，DOM应该已经完全准备好')
+    //         await startAllVideoStreams()
+    //     } catch (error) {
+    //         console.error('启动视频流失败:', error)
+    //     }
+    // }, 500)
 })
 
 onUnmounted(async () => {
@@ -1849,6 +2214,8 @@ onUnmounted(async () => {
     if (startupTimer) {
         clearTimeout(startupTimer)
     }
+
+
 
     // 取消deviceStore订阅，防止组件卸载后仍触发回调
     if (storeUnsubscribe) {
@@ -2693,6 +3060,13 @@ onUnmounted(async () => {
             opacity: 0.8;
         }
     }
+}
+
+/* 监控显示区域样式 */
+.monitor-display {
+    position: relative;
+    width: 100%;
+    height: 100%;
 }
 
 :deep(.confirm-btn) {
