@@ -33,6 +33,11 @@ export const useDeviceStore = defineStore('device', {
                 const data = response.data || { devices: [], alarms: [] }
 
                 console.log('设备状态数据:', data)
+                console.log('设备列表详情:', data.devices)
+                if (data.devices && data.devices.length > 0) {
+                    console.log('设备名称列表:', data.devices.map(d => d.name))
+                    console.log('设备ID列表:', data.devices.map(d => d.id))
+                }
                 this.devices = data.devices || []
                 this.alarms = data.alarms || []
                 return data

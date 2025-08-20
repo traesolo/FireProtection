@@ -229,9 +229,9 @@ const alarmData = computed(() => {
         name: alarm.name || '',
         status: getAlarmStatusText(alarm.status, alarm.name),
         alarmLevel: getAlarmLevel(alarm.status),
-        productTime: formatDateTime(alarm.since),
-        endTime: formatDateTime(alarm.resolveTime || alarm.alarmTime),
-        alarmDate: formatDate(alarm.alarmTime)
+        productTime: formatDateTime(alarm.alarmStartTime),
+        endTime: formatDateTime(alarm.alarmEndTime),
+        alarmDate: formatDate(alarm.alarmDate)
     }))
 })
 // 时间格式化函数
@@ -630,9 +630,9 @@ const fetchCustomDeviceInfo = async () => {
                     displayPath = iconPath.startsWith('http') ? iconPath :
                         `http://test.junhekh.cn:8061${iconPath}`
                 } else {
-                    // 生产环境：使用127.0.0.1:8061拼接完整的服务器地址
+                    // 生产环境：使用192.168.1.200:8061拼接完整的服务器地址
                     displayPath = iconPath.startsWith('http') ? iconPath :
-                        `http://127.0.0.1:8061${iconPath}`
+                        `http://192.168.1.200:8061${iconPath}`
                 }
             }
 
@@ -851,9 +851,9 @@ const handleUploadSuccess = (response, file) => {
             settingsForm.value.uploadedImageUrl = response.path.startsWith('http') ?
                 response.path : `http://test.junhekh.cn:8061${response.path}`
         } else {
-            // 生产环境：使用127.0.0.1:8061拼接完整的服务器地址
+            // 生产环境：使用192.168.1.200:8061拼接完整的服务器地址
             settingsForm.value.uploadedImageUrl = response.path.startsWith('http') ?
-                response.path : `http://127.0.0.1:8061${response.path}`
+                response.path : `http://192.168.1.200:8061${response.path}`
         }
         // 拼接完整路径用于接口传参
         fullImagePath.value = `${API_CONFIG.BASE_URL}${response.path}`
