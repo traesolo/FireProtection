@@ -11,7 +11,9 @@ export const API_CONFIG = {
         MONITOR_STATUS: '/fire-monitor/api/monitor/status',
         // 自定义设备信息
         CUSTOM_DEVICE_INFO: '/fire-monitor/api/custom-device/info',
-        CUSTOM_DEVICE_SAVE: '/fire-monitor/api/custom-device/save'
+        CUSTOM_DEVICE_SAVE: '/fire-monitor/api/custom-device/save',
+        // 视频流获取接口
+        VIDEO_STREAM: '/fire-monitor/api/stream'
     }
 }
 

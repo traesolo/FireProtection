@@ -35,7 +35,7 @@
                                 正在连接摄像头...</div>
                             <div v-else-if="safeVideoStreams.left.error" key="left-error" class="monitor-placeholder">
                                 连接失败: {{ safeVideoStreams.left.error || '未知错误' }}</div>
-                            <div v-else key="left-default" class="monitor-placeholder">监控区域1</div>
+                            <div v-else key="left-default" class="monitor-placeholder"></div>
                         </div>
                     </div>
                 </div>
@@ -54,7 +54,7 @@
                                 class="monitor-placeholder">正在连接摄像头...</div>
                             <div v-else-if="safeVideoStreams.right.error" key="right-error" class="monitor-placeholder">
                                 连接失败: {{ safeVideoStreams.right.error || '未知错误' }}</div>
-                            <div v-else key="right-default" class="monitor-placeholder">监控区域2</div>
+                            <div v-else key="right-default" class="monitor-placeholder"></div>
                         </div>
                     </div>
                 </div>
@@ -238,7 +238,7 @@ import { useRouter } from 'vue-router'
 import { useDeviceStore } from '../api/device'
 import request from '../utils/request'
 import { API_CONFIG, buildUrl } from '../config/api'
-import { VideoStreamManager } from '../utils/videoStream.js'
+// VideoStreamManager已移除，直接使用接口获取视频流
 import Hls from 'hls.js'
 
 // 监控摄像头配置
@@ -266,7 +266,7 @@ const monitorConfig = {
 }
 
 // 视频流管理器
-const videoStreamManager = new VideoStreamManager()
+// 不再使用videoStreamManager
 
 // 组件卸载标志
 const isUnmounted = ref(false)
@@ -653,128 +653,48 @@ const safeVideoStreams = computed(() => {
 
 // 启动视频流
 const startVideoStream = async (position) => {
-    const config = position === 'left' ? monitorConfig.camera1 : monitorConfig.camera2
-
+    const cameraIndex = position === 'left' ? 0 : 1
+    
     try {
-        // 检查组件是否已卸载
-        if (isUnmounted.value) {
-            console.warn(`组件已卸载，跳过${position}视频流启动`)
+        if (isUnmounted.value || !videoStreams.value?.[position]) {
+            console.log(`跳过启动视频流 ${position}: 组件已卸载或流对象不存在`)
             return
         }
-
-        // 安全检查
-        if (!videoStreams || !videoStreams.value || !videoStreams.value[position]) {
-            window.alert(`${position}视频流状态对象不存在`)
-            return
-        }
-
-        // 使用try-catch保护响应式对象访问
-        try {
+        
+        console.log(`开始启动视频流 ${position}, 摄像头索引: ${cameraIndex}`)
+        videoStreams.value[position].loading = true
+        videoStreams.value[position].error = null
+        
+        // 调用接口获取视频流
+        const url = `${API_CONFIG.ENDPOINTS.VIDEO_STREAM}/${cameraIndex}`
+        console.log(`请求视频流接口: ${url}`)
+        const response = await request.get(url)
+        
+        if (response.data?.success && response.data?.hlsUrl) {
+            const baseUrl = 'http://127.0.0.1:8061'
+            const fullHlsUrl = response.data.hlsUrl.startsWith('http') 
+                ? response.data.hlsUrl 
+                : `${baseUrl}${response.data.hlsUrl}`
+            
+            videoStreams.value[position].hlsUrl = fullHlsUrl
+            videoStreams.value[position].active = true
+            
+            await nextTick()
+            await new Promise(resolve => setTimeout(resolve, 100))
+            
             if (!isUnmounted.value) {
-                videoStreams.value[position].loading = true
-                videoStreams.value[position].error = null
-                videoStreams.value[position].active = false
-            }
-        } catch (reactiveError) {
-            console.warn('设置视频流状态时发生错误:', reactiveError)
-            return
-        }
-
-        const result = await videoStreamManager.startStream(config)
-
-        if (result.success) {
-            try {
-                if (!isUnmounted.value && videoStreams.value && videoStreams.value[position]) {
-                    videoStreams.value[position].hlsUrl = result.hlsUrl
-                    // 视频流启动成功
-
-                    // 先设置 active 状态，让 video 元素渲染到 DOM
-                    videoStreams.value[position].active = true
-
-                    // 等待DOM更新后初始化HLS播放器
-                    await nextTick()
-                    // 添加额外延迟确保DOM完全渲染
-                    await new Promise(resolve => setTimeout(resolve, 100))
-
-                    // 再次检查组件是否已卸载
-                    if (!isUnmounted.value) {
-                        await initHlsPlayer(position, result.hlsUrl)
-                    }
-                }
-            } catch (reactiveError) {
-                console.warn('更新视频流成功状态时发生错误:', reactiveError)
+                await initHlsPlayer(position, fullHlsUrl)
             }
         } else {
-            try {
-                if (!isUnmounted.value && videoStreams.value && videoStreams.value[position]) {
-                    // 从videoStreamManager返回的错误信息在message字段中
-                    let errorMessage = result.message || result.error || '启动失败'
-
-                    let detailedError = errorMessage
-                    // 根据错误类型提供更详细的提示
-                    if (errorMessage.includes('FFmpeg未找到')) {
-                        detailedError = 'FFmpeg程序未安装或路径配置错误，请检查Linux系统环境'
-                    } else if (errorMessage.includes('ENOTDIR') || errorMessage.includes('not a directory')) {
-                        detailedError = 'FFmpeg路径配置错误：目录不存在或路径指向文件而非目录。这通常发生在Linux ARM64构建时FFmpeg二进制文件缺失，请检查构建配置或手动安装对应架构的FFmpeg'
-                    } else if (errorMessage.includes('ENOENT') && errorMessage.includes('spawn')) {
-                        detailedError = 'FFmpeg可执行文件未找到，可能是ARM64架构的FFmpeg二进制文件缺失。请确保已下载并正确配置对应架构的FFmpeg版本'
-                    } else if (errorMessage.includes('spawn') && (errorMessage.includes('ffmpeg') || errorMessage.includes('FFmpeg'))) {
-                        detailedError = 'FFmpeg进程启动失败，可能是二进制文件损坏或权限不足。在Linux ARM64环境下，请确保FFmpeg二进制文件具有执行权限'
-                    } else if (errorMessage.includes('RTSP') || errorMessage.includes('rtsp')) {
-                        detailedError = '摄像头RTSP连接失败，请检查IP地址、端口和认证信息'
-                    } else if (errorMessage.includes('timeout') || errorMessage.includes('超时')) {
-                        detailedError = '连接超时，请检查网络连接和摄像头状态'
-                    } else if (errorMessage.includes('permission') || errorMessage.includes('权限')) {
-                        detailedError = '权限不足，请检查用户名和密码'
-                    } else if (errorMessage.includes('Connection refused') || errorMessage.includes('连接被拒绝')) {
-                        detailedError = '摄像头拒绝连接，请检查设备状态和网络配置'
-                    } else if (errorMessage.includes('No route to host') || errorMessage.includes('无法到达主机')) {
-                        detailedError = '网络不可达，请检查IP地址和网络连接'
-                    }
-
-                    videoStreams.value[position].error = detailedError
-                }
-            } catch (reactiveError) {
-                console.warn('设置视频流错误状态时发生错误:', reactiveError)
-            }
-            window.alert(`${position}视频流启动失败: ${result.message || result.error || '未知错误'}`)
+            videoStreams.value[position].error = '获取视频流失败'
         }
     } catch (error) {
-        try {
-            if (!isUnmounted.value && videoStreams && videoStreams.value && videoStreams.value[position]) {
-                let errorMessage = error.message || '连接异常'
-                let detailedError = errorMessage
-
-                // 根据异常类型提供更详细的提示
-                if (errorMessage.includes('Network Error') || errorMessage.includes('网络错误')) {
-                    detailedError = '网络连接异常，请检查网络状态和防火墙设置'
-                } else if (errorMessage.includes('ENOTDIR') || errorMessage.includes('not a directory')) {
-                    detailedError = 'FFmpeg路径配置错误：目录不存在或路径指向文件而非目录。这通常发生在Linux ARM64构建时FFmpeg二进制文件缺失，请检查构建配置或手动安装对应架构的FFmpeg'
-                } else if (errorMessage.includes('spawn') && errorMessage.includes('ENOENT')) {
-                    detailedError = 'FFmpeg可执行文件未找到，可能是ARM64架构的FFmpeg二进制文件缺失。请确保已下载并正确配置对应架构的FFmpeg版本'
-                } else if (errorMessage.includes('spawn') && (errorMessage.includes('ffmpeg') || errorMessage.includes('FFmpeg'))) {
-                    detailedError = 'FFmpeg进程启动失败，可能是二进制文件损坏或权限不足。在Linux ARM64环境下，请确保FFmpeg二进制文件具有执行权限'
-                } else if (errorMessage.includes('ECONNREFUSED')) {
-                    detailedError = '连接被拒绝，请检查摄像头IP地址和端口设置'
-                } else if (errorMessage.includes('ETIMEDOUT')) {
-                    detailedError = '连接超时，请检查网络连接和摄像头状态'
-                } else if (errorMessage.includes('EHOSTUNREACH')) {
-                    detailedError = '主机不可达，请检查IP地址和网络路由'
-                }
-
-                videoStreams.value[position].error = detailedError
-            }
-        } catch (reactiveError) {
-            console.warn('设置视频流异常状态时发生错误:', reactiveError)
+        if (videoStreams.value?.[position]) {
+            videoStreams.value[position].error = '连接异常'
         }
-        window.alert(`${position}视频流异常: ${error.message || error}`)
     } finally {
-        try {
-            if (!isUnmounted.value && videoStreams && videoStreams.value && videoStreams.value[position]) {
-                videoStreams.value[position].loading = false
-            }
-        } catch (reactiveError) {
-            console.warn('重置视频流loading状态时发生错误:', reactiveError)
+        if (videoStreams.value?.[position]) {
+            videoStreams.value[position].loading = false
         }
     }
 }
@@ -782,72 +702,22 @@ const startVideoStream = async (position) => {
 // 初始化HLS播放器
 const initHlsPlayer = async (position, hlsUrl) => {
     try {
-        // 检查组件是否已卸载
-        if (isUnmounted.value) {
-            console.warn(`组件已卸载，跳过${position}HLS播放器初始化`)
-            return
-        }
-
-        // 等待更长时间确保DOM更新完成
-        await new Promise(resolve => setTimeout(resolve, 200))
-
-        // 再次检查组件是否已卸载
-        if (isUnmounted.value) {
-            console.warn(`组件已卸载，停止${position}HLS播放器初始化`)
-            return
-        }
-
-        // 添加更多的重试机制和错误处理
-        let videoElement = null
-        let retryCount = 0
-        const maxRetries = 10
-
-        while (!videoElement && retryCount < maxRetries) {
-            // 检查组件是否已卸载
-            if (isUnmounted.value) {
-                console.warn(`组件已卸载，停止${position}视频元素查找`)
-                return
-            }
-
-            // 确保容器元素存在
-            const containerElement = document.querySelector(`#monitor-${position}`)
-            if (!containerElement) {
-                console.warn(`第${retryCount + 1}次尝试：找不到${position}容器元素，等待DOM渲染...`)
-                await new Promise(resolve => setTimeout(resolve, 200))
-                retryCount++
-                continue
-            }
-
-            videoElement = containerElement.querySelector('video')
-            if (!videoElement) {
-                console.warn(`第${retryCount + 1}次尝试：找不到${position}视频元素，等待DOM渲染...`)
-                await new Promise(resolve => setTimeout(resolve, 200))
-                retryCount++
-            }
-        }
-
+        if (isUnmounted.value) return
+        
+        const videoElement = document.querySelector(`#monitor-${position} video`)
         if (!videoElement) {
-            window.alert(`经过${maxRetries}次尝试后仍找不到${position}视频元素，DOM可能未正确渲染`)
-            if (!isUnmounted.value && videoStreams.value && videoStreams.value[position]) {
+            if (videoStreams.value?.[position]) {
                 videoStreams.value[position].error = 'DOM元素未找到'
             }
             return
         }
-
-        // 检查是否在浏览器环境下的模拟模式
-        const isElectron = window.electronAPI !== undefined
-        if (!isElectron) {
-            console.log(`${position}视频流在浏览器环境下运行，跳过HLS播放器初始化`)
-            // 在浏览器环境下，视频流由createMockVideoStream处理
-            return
-        }
-
+        
         // 销毁现有的HLS实例
-        if (videoStreams.value[position].hlsInstance) {
+        if (videoStreams.value[position]?.hlsInstance) {
             videoStreams.value[position].hlsInstance.destroy()
             videoStreams.value[position].hlsInstance = null
         }
-
+        
         if (Hls.isSupported()) {
             const hls = new Hls({
                 debug: false,
@@ -855,76 +725,46 @@ const initHlsPlayer = async (position, hlsUrl) => {
                 lowLatencyMode: true,
                 backBufferLength: 90
             })
-
+            
             hls.loadSource(hlsUrl)
             hls.attachMedia(videoElement)
-
+            
             hls.on(Hls.Events.MANIFEST_PARSED, () => {
-                console.log(`${position}视频流HLS清单解析完成，开始播放`)
-                videoElement.play().catch(e => {
-                    window.alert(`${position}视频播放失败: ${e.message || e}`)
-                })
+                videoElement.play().catch(() => {})
             })
-
+            
             hls.on(Hls.Events.ERROR, (event, data) => {
-                window.alert(`${position}视频流HLS错误: ${data.details || data.type || '未知错误'}`)
-
-                // 检查组件是否已经卸载，防止访问已销毁的响应式对象
-                if (isUnmounted.value) {
-                    console.warn(`组件已卸载，跳过${position}视频流错误处理`)
-                    return
-                }
-
-                try {
-                    // 添加null检查，防止访问null对象的属性
-                    if (data && data.fatal) {
-                        switch (data.type) {
-                            case Hls.ErrorTypes.NETWORK_ERROR:
-                                console.log('网络错误，尝试恢复')
-                                hls.startLoad()
-                                break
-                            case Hls.ErrorTypes.MEDIA_ERROR:
-                                console.log('媒体错误，尝试恢复')
-                                hls.recoverMediaError()
-                                break
-                            default:
-                                console.log('无法恢复的错误，销毁播放器')
-                                hls.destroy()
-                                // 安全地更新状态，检查响应式对象是否仍然有效
-                                if (!isUnmounted.value && videoStreams && videoStreams.value && videoStreams.value[position]) {
-                                    videoStreams.value[position].error = '播放器错误'
-                                }
-                                break
-                        }
-                    } else if (data) {
-                        // 非致命错误的处理
-                        console.warn(`${position}视频流非致命错误:`, data)
-                    } else {
-                        // data为null的情况
-                        console.warn(`${position}视频流错误，但错误数据为空`)
+                if (data?.fatal) {
+                    switch (data.type) {
+                        case Hls.ErrorTypes.NETWORK_ERROR:
+                            hls.startLoad()
+                            break
+                        case Hls.ErrorTypes.MEDIA_ERROR:
+                            hls.recoverMediaError()
+                            break
+                        default:
+                            hls.destroy()
+                            if (videoStreams.value?.[position]) {
+                                videoStreams.value[position].error = '播放器错误'
+                            }
+                            break
                     }
-                } catch (error) {
-                    // 捕获可能的响应式对象访问错误
-                    console.warn(`处理${position}视频流错误时发生异常:`, error)
                 }
             })
-
+            
             videoStreams.value[position].hlsInstance = hls
         } else if (videoElement.canPlayType('application/vnd.apple.mpegurl')) {
-            // Safari原生支持HLS
             videoElement.src = hlsUrl
             videoElement.addEventListener('loadedmetadata', () => {
-                videoElement.play().catch(e => {
-                    window.alert(`${position}视频播放失败: ${e.message || e}`)
-                })
+                videoElement.play().catch(() => {})
             })
         } else {
-            window.alert('浏览器不支持HLS播放')
-            videoStreams.value[position].error = '浏览器不支持HLS播放'
+            if (videoStreams.value?.[position]) {
+                videoStreams.value[position].error = '浏览器不支持HLS播放'
+            }
         }
     } catch (error) {
-        window.alert(`初始化${position}HLS播放器失败: ${error.message || error}`)
-        if (!isUnmounted.value && videoStreams.value && videoStreams.value[position]) {
+        if (videoStreams.value?.[position]) {
             videoStreams.value[position].error = '播放器初始化失败'
         }
     }
@@ -947,19 +787,19 @@ const stopVideoStream = async (position) => {
             videoStreams.value[position].hlsInstance = null
         }
 
-        await videoStreamManager.stopStream(config.id)
+        // 视频流已通过HLS实例销毁
         videoStreams.value[position].active = false
         videoStreams.value[position].hlsUrl = null
         videoStreams.value[position].error = null
         console.log(`${position}视频流已停止`)
     } catch (error) {
-        window.alert(`停止${position}视频流失败: ${error.message || error}`)
+        console.error(`停止${position}视频流失败:`, error)
     }
 }
 
 // 处理视频错误
 const handleVideoError = (position, event) => {
-    window.alert(`${position}视频播放错误: ${event.message || event.type || '未知错误'}`)
+    console.error(`${position}视频播放错误:`, event)
     if (!isUnmounted.value && videoStreams.value && videoStreams.value[position]) {
         videoStreams.value[position].error = '视频播放失败'
         videoStreams.value[position].active = false
@@ -1192,6 +1032,9 @@ const verifyPassword = async (username, password) => {
         return false
     }
 }
+
+// 获取实时监控流
+
 
 const handleSettingsConfirm = async () => {
     await Promise.all([saveThresholds(), saveStationNumber(), saveCustomDeviceInfo()])
@@ -2202,8 +2045,6 @@ onMounted(async () => {
 
 
 
-    // 注释掉视频流启动 - 根据用户要求暂时禁用监控视频流
-    /*
     // 确保DOM完全渲染后再启动视频流
     await nextTick()
     // 添加更长的延迟确保DOM元素完全准备好和稳定
@@ -2219,7 +2060,6 @@ onMounted(async () => {
             console.error('启动视频流失败:', error)
         }
     }, 500)
-    */
 })
 
 onUnmounted(async () => {
@@ -2274,8 +2114,7 @@ onUnmounted(async () => {
 
         // 停止所有视频流
         await stopAllVideoStreams()
-        // 确保videoStreamManager也停止所有流
-        await videoStreamManager.stopAllStreams()
+        // 所有视频流已通过stopAllVideoStreams停止
     } catch (error) {
         console.warn('清理视频流资源时发生错误:', error)
     }

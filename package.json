@@ -28,10 +28,7 @@
     "electron:build:mac:arm64": "npm run build && electron-builder --mac --arm64",
     "electron:build:linux:wsl": "wsl npm run build && wsl npx electron-builder --linux",
     "build:linux:remote": "node scripts/build-linux-remote.cjs",
-    "build:linux:docker": "docker build -t fireprotection-builder . && docker run --rm -v \"${PWD}:/workspace\" fireprotection-builder",
-    "setup:ffmpeg": "node scripts/download-ffmpeg.cjs",
-    "test:ffmpeg": "node scripts/test-ffmpeg-paths.cjs",
-    "diagnose:linux-arm64": "node scripts/test-ffmpeg-paths.cjs && echo \"\n📖 如需更多帮助，请查看: docs/LINUX-ARM64-TROUBLESHOOTING.md\""
+    "build:linux:docker": "docker build -t fireprotection-builder . && docker run --rm -v \"${PWD}:/workspace\" fireprotection-builder"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^4.0.0",

@@ -97,9 +97,9 @@ npm run electron:build:mac
 2. 更新 `src/views/Home.vue` 中的设备列表
 3. 测试设备连接和数据显示
 
-### 自定义视频流处理
+### 视频流处理
 
-参考 `src/utils/videoStream.js` 中的 `VideoStreamManager` 类。
+视频流现在直接从接口获取HLS流URL，使用hls.js库进行播放。
 
 ## 贡献
 

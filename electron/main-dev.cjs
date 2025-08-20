@@ -1,69 +1,10 @@
 const { app, BrowserWindow } = require('electron')
 const path = require('path')
-const fs = require('fs')
-const http = require('http')
-const express = require('express')
 
 let mainWindow
-let hlsServer = null
-const HLS_PORT = 8080
-const HLS_DIR = path.join(__dirname, '../hls')
+// HLS服务器相关变量已移除
 
-// 初始化HLS目录
-function initHLSDirectory() {
-    try {
-        if (!fs.existsSync(HLS_DIR)) {
-            fs.mkdirSync(HLS_DIR, { recursive: true })
-            console.log('HLS目录创建成功:', HLS_DIR)
-        } else {
-            // 清理旧的HLS文件
-            const files = fs.readdirSync(HLS_DIR)
-            files.forEach(file => {
-                if (file.endsWith('.m3u8') || file.endsWith('.ts')) {
-                    fs.unlinkSync(path.join(HLS_DIR, file))
-                }
-            })
-            console.log('HLS目录清理完成')
-        }
-    } catch (error) {
-        console.error('初始化HLS目录失败:', error)
-    }
-}
-
-// 启动HLS服务器
-function startHLSServer() {
-    try {
-        const app = express()
-        
-        // 设置CORS头
-        app.use((req, res, next) => {
-            res.header('Access-Control-Allow-Origin', '*')
-            res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
-            res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept')
-            next()
-        })
-        
-        // 提供HLS文件服务
-        app.use('/hls', express.static(HLS_DIR))
-        
-        // 健康检查端点
-        app.get('/health', (req, res) => {
-            res.json({ status: 'ok', message: 'HLS server running in dev mode' })
-        })
-        
-        hlsServer = http.createServer(app)
-        hlsServer.listen(HLS_PORT, () => {
-            console.log(`开发模式HLS服务器启动成功，端口: ${HLS_PORT}`)
-        })
-        
-        hlsServer.on('error', (error) => {
-            console.error('HLS服务器错误:', error)
-        })
-        
-    } catch (error) {
-        console.error('启动HLS服务器失败:', error)
-    }
-}
+// HLS目录初始化和服务器启动函数已移除
 
 function createWindow() {
     mainWindow = new BrowserWindow({
@@ -91,10 +32,6 @@ function createWindow() {
 
 app.whenReady().then(() => {
     try {
-        // 初始化HLS目录和服务器
-        initHLSDirectory()
-        startHLSServer()
-        
         // 创建主窗口
         createWindow()
         
@@ -106,12 +43,6 @@ app.whenReady().then(() => {
 })
 
 app.on('window-all-closed', () => {
-    // 关闭HLS服务器
-    if (hlsServer) {
-        hlsServer.close(() => {
-            console.log('HLS服务器已关闭')
-        })
-    }
     app.quit()
 })
 
