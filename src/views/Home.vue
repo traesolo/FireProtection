@@ -29,8 +29,7 @@
                             <video v-if="safeVideoStreams.left.active" key="left-video" autoplay playsinline
                                 style="width: 484px; height: 275px; object-fit: cover;"
                                 :src="safeVideoStreams.left.isPlayingVideo ? safeVideoStreams.left.videoUrl : undefined"
-                                :volume="1.0"
-                                @error="handleVideoError('left', $event)"></video>
+                                :volume="1.0" @error="handleVideoError('left', $event)"></video>
                             <div v-else-if="safeVideoStreams.left.loading" key="left-loading"
                                 class="monitor-placeholder">
                                 正在连接摄像头...</div>
@@ -50,8 +49,7 @@
                             <video v-if="safeVideoStreams.right.active" key="right-video" autoplay playsinline
                                 style="width: 484px; height: 275px; object-fit: cover;"
                                 :src="safeVideoStreams.right.isPlayingVideo ? safeVideoStreams.right.videoUrl : undefined"
-                                :volume="1.0"
-                                @error="handleVideoError('right', $event)"></video>
+                                :volume="1.0" @error="handleVideoError('right', $event)"></video>
                             <div v-else-if="safeVideoStreams.right.loading" key="right-loading"
                                 class="monitor-placeholder">正在连接摄像头...</div>
                             <div v-else-if="safeVideoStreams.right.error" key="right-error" class="monitor-placeholder">
@@ -1736,7 +1734,14 @@ const updateDeviceGroups = () => {
     }
 
     try {
-        const devices = deviceStore.devices.map(device => {
+        // 对设备数组进行排序，将customDevice1移动到最后
+        const sortedDevices = [...deviceStore.devices].sort((a, b) => {
+            if (a.id === 'customDevice1') return 1
+            if (b.id === 'customDevice1') return -1
+            return 0
+        })
+
+        const devices = sortedDevices.map(device => {
             if (!device) return null
             const statusInfo = getDeviceStatus(device.currentStatus, device.name)
 
@@ -2198,20 +2203,20 @@ onMounted(async () => {
 
 
     // // 确保DOM完全渲染后再启动视频流
-    // await nextTick()
-    // // 添加更长的延迟确保DOM元素完全准备好和稳定
-    // startupTimer = setTimeout(async () => {
-    //     if (isUnmounted.value) {
-    //         console.log('组件已卸载，跳过视频流启动')
-    //         return
-    //     }
-    //     try {
-    //         console.log('开始启动视频流，DOM应该已经完全准备好')
-    //         await startAllVideoStreams()
-    //     } catch (error) {
-    //         console.error('启动视频流失败:', error)
-    //     }
-    // }, 500)
+    await nextTick()
+    // 添加更长的延迟确保DOM元素完全准备好和稳定
+    startupTimer = setTimeout(async () => {
+        if (isUnmounted.value) {
+            console.log('组件已卸载，跳过视频流启动')
+            return
+        }
+        try {
+            console.log('开始启动视频流，DOM应该已经完全准备好')
+            await startAllVideoStreams()
+        } catch (error) {
+            console.error('启动视频流失败:', error)
+        }
+    }, 500)
 })
 
 onUnmounted(async () => {
