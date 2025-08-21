@@ -273,16 +273,38 @@ function showExitDialog() {
 
     if (result === 1) {
         console.log('用户确认退出 - 开始清理资源')
-        // 清理所有视频流和资源
-        cleanup()
-        // 设置强制退出标志
-        global.forceQuit = true
-        // 强制关闭所有窗口
-        if (mainWindow && !mainWindow.isDestroyed()) {
-            mainWindow.destroy()
+        
+        try {
+            // 清理所有视频流和资源
+            cleanup()
+            
+            // 设置强制退出标志
+            global.forceQuit = true
+            
+            // 温和地关闭窗口
+            if (mainWindow && !mainWindow.isDestroyed()) {
+                mainWindow.webContents.closeDevTools()
+                mainWindow.close()
+            }
+            
+            // 给一些时间让窗口正常关闭
+            setTimeout(() => {
+                // 如果窗口还没关闭，强制销毁
+                if (mainWindow && !mainWindow.isDestroyed()) {
+                    mainWindow.destroy()
+                }
+                // 退出应用
+                app.quit()
+            }, 1000)
+            
+        } catch (error) {
+            console.error('退出过程中发生错误:', error)
+            // 如果出现错误，强制退出
+            if (mainWindow && !mainWindow.isDestroyed()) {
+                mainWindow.destroy()
+            }
+            process.exit(1)
         }
-        // 立即退出应用
-        process.exit(0)
     }
 }
 
@@ -290,51 +312,64 @@ function showExitDialog() {
 function cleanup() {
     console.log('开始清理资源...')
     
-    // 停止所有视频流
-    for (const [id, stream] of videoStreams) {
-        if (stream.process && !stream.process.killed) {
-            console.log(`停止视频流: ${id}`)
-            stream.process.kill('SIGTERM')
-        }
-    }
+    // 注意：视频流相关代码已移除，现在直接从接口获取视频流
+    // 这里只进行基本的资源清理
     
-    // 清理HLS文件
     try {
-        if (fs.existsSync(HLS_DIR)) {
-            const files = fs.readdirSync(HLS_DIR)
+        // 清理可能的临时文件
+        const tempDir = path.join(__dirname, 'temp')
+        if (fs.existsSync(tempDir)) {
+            const files = fs.readdirSync(tempDir)
             files.forEach(file => {
-                if (file.endsWith('.m3u8') || file.endsWith('.ts')) {
-                    fs.unlinkSync(path.join(HLS_DIR, file))
+                try {
+                    fs.unlinkSync(path.join(tempDir, file))
+                } catch (err) {
+                    console.warn(`清理临时文件失败: ${file}`, err)
                 }
             })
         }
     } catch (error) {
-        console.warn('清理HLS文件失败:', error)
+        console.warn('清理临时文件失败:', error)
     }
     
-    // 关闭HLS服务器
-    if (hlsServer) {
-        hlsServer.close()
-        console.log('HLS服务器已关闭')
-    }
-    
-    videoStreams.clear()
     console.log('资源清理完成')
 }
 
 // IPC通信
-ipcMain.handle('exit-app', () => {
+ipcMain.handle('exit-app', async () => {
     console.log('收到IPC退出请求 - 开始清理资源')
-    // 清理所有视频流和资源
-    cleanup()
-    // 设置强制退出标志
-    global.forceQuit = true
-    // 强制关闭所有窗口
-    if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.destroy()
+    
+    try {
+        // 清理所有视频流和资源
+        cleanup()
+        
+        // 设置强制退出标志
+        global.forceQuit = true
+        
+        // 温和地关闭窗口
+        if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.webContents.closeDevTools()
+            mainWindow.close()
+        }
+        
+        // 给一些时间让窗口正常关闭
+        setTimeout(() => {
+            // 如果窗口还没关闭，强制销毁
+            if (mainWindow && !mainWindow.isDestroyed()) {
+                mainWindow.destroy()
+            }
+            // 退出应用
+            app.quit()
+        }, 1000)
+        
+    } catch (error) {
+        console.error('退出过程中发生错误:', error)
+        // 如果出现错误，强制退出
+        if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.destroy()
+        }
+        process.exit(1)
     }
-    // 立即退出应用
-    process.exit(0)
 })
 
 // 视频流IPC处理器已移除
@@ -422,16 +457,38 @@ app.whenReady().then(async () => {
         // 开发模式强制退出
         globalShortcut.register('Ctrl+Q', () => {
             console.log('Ctrl+Q 强制退出 - 开始清理资源')
-            // 清理所有视频流和资源
-            cleanup()
-            // 设置强制退出标志
-            global.forceQuit = true
-            // 强制关闭所有窗口
-            if (mainWindow && !mainWindow.isDestroyed()) {
-                mainWindow.destroy()
+            
+            try {
+                // 清理所有视频流和资源
+                cleanup()
+                
+                // 设置强制退出标志
+                global.forceQuit = true
+                
+                // 温和地关闭窗口
+                if (mainWindow && !mainWindow.isDestroyed()) {
+                    mainWindow.webContents.closeDevTools()
+                    mainWindow.close()
+                }
+                
+                // 给一些时间让窗口正常关闭
+                setTimeout(() => {
+                    // 如果窗口还没关闭，强制销毁
+                    if (mainWindow && !mainWindow.isDestroyed()) {
+                        mainWindow.destroy()
+                    }
+                    // 退出应用
+                    app.quit()
+                }, 500) // 开发模式下缩短等待时间
+                
+            } catch (error) {
+                console.error('退出过程中发生错误:', error)
+                // 如果出现错误，强制退出
+                if (mainWindow && !mainWindow.isDestroyed()) {
+                    mainWindow.destroy()
+                }
+                process.exit(1)
             }
-            // 立即退出应用
-            process.exit(0)
         })
     } else {
         console.log('注册生产模式快捷键')
