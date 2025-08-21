@@ -586,21 +586,12 @@ const onVideoEnded = (position) => {
 
         console.log(`🔄 ${position}区域准备处理下一个视频，队列长度:`, videoPlayQueue.value.length)
 
-        // 检查队列中是否还有该区域的视频要播放
-        const hasQueueForThisArea = videoPlayQueue.value.some(video => {
-            // 根据优先级判断视频应该在哪个区域播放
-            // 优先级1的视频在左侧，其他在右侧
-            const shouldPlayInLeft = video.priority === 1
-            const targetArea = shouldPlayInLeft ? 'left' : 'right'
-            return targetArea === position
-        })
-
         if (videoPlayQueue.value.length > 0) {
             console.log(`📋 继续处理队列中的视频`)
             processVideoQueue()
-        } else if (!hasQueueForThisArea) {
-            // 该区域没有更多视频要播放，立即恢复该区域的监控流
-            console.log(`📺 ${position}区域没有更多视频，立即恢复监控流`)
+        } else {
+            // 队列为空，立即恢复该区域的监控流
+            console.log(`📺 ${position}区域队列为空，立即恢复监控流`)
             setTimeout(() => {
                 if (isUnmounted.value) return
                 restoreMonitorStream(position)
@@ -652,22 +643,13 @@ const onVideoError = (position, videoInfo) => {
 
         console.log(`🔄 ${position}区域错误处理完成，检查队列`)
 
-        // 检查队列中是否还有该区域的视频要播放
-        const hasQueueForThisArea = videoPlayQueue.value.some(video => {
-            // 根据优先级判断视频应该在哪个区域播放
-            // 优先级1的视频在左侧，其他在右侧
-            const shouldPlayInLeft = video.priority === 1
-            const targetArea = shouldPlayInLeft ? 'left' : 'right'
-            return targetArea === position
-        })
-
         // 继续处理队列或恢复监控
         if (videoPlayQueue.value.length > 0) {
             console.log(`📋 队列中还有${videoPlayQueue.value.length}个视频，继续处理`)
             processVideoQueue()
-        } else if (!hasQueueForThisArea) {
-            // 该区域没有更多视频要播放，立即恢复该区域的监控流
-            console.log(`📺 ${position}区域没有更多视频，立即恢复监控流`)
+        } else {
+            // 队列为空，立即恢复该区域的监控流
+            console.log(`📺 ${position}区域队列为空，立即恢复监控流`)
             restoreMonitorStream(position)
         }
     }, 500) // 延迟500ms处理
