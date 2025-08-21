@@ -344,21 +344,21 @@ const addToVideoQueue = (device) => {
         timestamp: Date.now()
     }
 
-    // 检查是否已在队列中
-    const existingIndex = videoPlayQueue.value.findIndex(item => item.id === device.id)
-    if (existingIndex === -1) {
+    // 检查队列中是否已有相同类型的设备视频（按设备类型去重）
+    const existingTypeIndex = videoPlayQueue.value.findIndex(item => item.type === deviceType)
+    if (existingTypeIndex === -1) {
         videoPlayQueue.value.push(videoInfo)
         // 按优先级排序，优先级数字越小越优先（灭火器=1，消防水枪=2，泡沫喷枪=3）
         videoPlayQueue.value.sort((a, b) => a.priority - b.priority)
-        console.log('📝 添加视频到队列:', videoInfo.name, '优先级:', videoInfo.priority)
-        console.log('📋 当前队列:', videoPlayQueue.value.map(v => `${v.name}(优先级:${v.priority})`).join(', '))
+        console.log('📝 添加视频到队列:', videoInfo.name, '类型:', deviceType, '优先级:', videoInfo.priority)
+        console.log('📋 当前队列:', videoPlayQueue.value.map(v => `${v.name}(类型:${v.type},优先级:${v.priority})`).join(', '))
 
         // 延迟处理队列，避免并发问题
         nextTick(() => {
             processVideoQueue()
         })
     } else {
-        console.log('⚠️ 设备已在队列中，跳过添加:', device.name)
+        console.log('⚠️ 队列中已有相同类型设备视频，跳过添加:', device.name, '类型:', deviceType)
     }
 }
 
