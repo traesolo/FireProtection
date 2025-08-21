@@ -293,20 +293,16 @@ const videoStreams = ref({
     }
 })
 
-// 视频播放队列管理
-const videoPlayQueue = ref([])
+// 固定区域视频播放管理
 const currentPlayingVideos = ref({
-    left: null,  // 当前左侧播放的视频信息
-    right: null  // 当前右侧播放的视频信息
+    left: null,  // 左侧当前播放的视频信息
+    right: null  // 右侧当前播放的视频信息
 })
 
-// 设备类型优先级映射
-const devicePriority = {
-    '灭火器': 1,
-    '消防水枪': 2,
-    '消防水带': 2, // 消防水带和消防水枪同等优先级
-    '泡沫喷枪': 3
-}
+// 右侧区域视频轮播管理
+const rightAreaVideoQueue = ref([])
+const rightAreaCurrentIndex = ref(0)
+let rightAreaPlayTimer = null
 
 // 设备类型到视频文件的映射
 const deviceVideoMap = {
@@ -330,110 +326,161 @@ const getDeviceType = (deviceName) => {
     return null
 }
 
-// 添加视频到播放队列
-const addToVideoQueue = (device) => {
-    const deviceType = getDeviceType(device.name)
-    if (!deviceType) return
-
-    const videoInfo = {
-        id: device.id,
-        name: device.name,
-        type: deviceType,
-        videoUrl: deviceVideoMap[deviceType],
-        priority: devicePriority[deviceType],
-        timestamp: Date.now()
-    }
-
-    // 检查队列中是否已有相同类型的设备视频（按设备类型去重）
-    const hasExistingType = videoPlayQueue.value.some(item => item.type === deviceType)
-
-    if (!hasExistingType) {
-        videoPlayQueue.value.push(videoInfo)
-        // 按优先级排序，优先级数字越小越优先（灭火器=1，消防水枪=2，泡沫喷枪=3）
-        videoPlayQueue.value.sort((a, b) => a.priority - b.priority)
-        console.log('📝 添加视频到队列:', videoInfo.name, '类型:', deviceType, '优先级:', videoInfo.priority)
-        console.log('📋 当前队列:', videoPlayQueue.value.map(v => `${v.name}(类型:${v.type},优先级:${v.priority})`).join(', '))
-
-        // 延迟处理队列，避免并发问题
-        nextTick(() => {
-            processVideoQueue()
-        })
-    } else {
-        console.log('⚠️ 队列中已有相同类型的设备视频，跳过添加:', device.name, '类型:', deviceType)
-    }
-}
-
-// 从队列中移除视频
-const removeFromVideoQueue = (deviceId) => {
-    const index = videoPlayQueue.value.findIndex(item => item.id === deviceId)
-    if (index !== -1) {
-        videoPlayQueue.value.splice(index, 1)
-        console.log('从队列移除视频:', deviceId)
-    }
-}
-
-// 处理视频播放队列
-const processVideoQueue = () => {
+// 检查并更新左侧区域视频播放（灭火器专用）
+const updateLeftAreaVideo = (devices) => {
     if (isUnmounted.value) return
 
-    console.log('🔄 处理视频队列，当前队列长度:', videoPlayQueue.value.length)
-    console.log('📺 当前播放状态 - 左侧:', currentPlayingVideos.value.left?.name || '空闲', '右侧:', currentPlayingVideos.value.right?.name || '空闲')
-    console.log('📋 队列详情:', videoPlayQueue.value.map(v => `${v.name}(优先级:${v.priority})`).join(', '))
+    // 检查是否有灭火器设备处于IN_USE状态
+    const fireExtinguisherInUse = devices.find(device => 
+        device.name.includes('灭火器') && device.currentStatus === 'IN_USE'
+    )
 
-    // 如果队列为空，直接返回
-    if (videoPlayQueue.value.length === 0) {
-        console.log('📋 队列为空，无需处理')
-        return
+    if (fireExtinguisherInUse) {
+        // 如果有灭火器在使用，播放灭火器视频
+        if (!currentPlayingVideos.value.left || currentPlayingVideos.value.left.type !== '灭火器') {
+            console.log('🔥 左侧区域开始播放灭火器视频:', fireExtinguisherInUse.name)
+            const videoInfo = {
+                id: fireExtinguisherInUse.id,
+                name: fireExtinguisherInUse.name,
+                type: '灭火器',
+                videoUrl: deviceVideoMap['灭火器']
+            }
+            playVideoInArea('left', videoInfo)
+        }
+    } else {
+        // 如果没有灭火器在使用，恢复监控流
+        if (currentPlayingVideos.value.left) {
+            console.log('🔥 左侧区域停止播放灭火器视频，恢复监控流')
+            stopVideoAndRestoreStream('left')
+        }
+    }
+}
+
+// 检查并更新右侧区域视频播放（消防水枪/水带和泡沫喷枪）
+const updateRightAreaVideo = (devices) => {
+    if (isUnmounted.value) return
+
+    // 检查消防水枪或消防水带是否处于IN_USE状态
+    const waterGunOrHoseInUse = devices.find(device => 
+        (device.name.includes('消防水枪') || device.name.includes('消防水带')) && 
+        device.currentStatus === 'IN_USE'
+    )
+
+    // 检查泡沫喷枪是否处于IN_USE状态
+    const foamGunInUse = devices.find(device => 
+        device.name.includes('泡沫喷枪') && device.currentStatus === 'IN_USE'
+    )
+
+    // 构建需要播放的视频列表
+    const videosToPlay = []
+    if (waterGunOrHoseInUse) {
+        videosToPlay.push({
+            id: waterGunOrHoseInUse.id,
+            name: waterGunOrHoseInUse.name,
+            type: waterGunOrHoseInUse.name.includes('消防水枪') ? '消防水枪' : '消防水带',
+            videoUrl: deviceVideoMap['消防水枪'] // 消防水枪和消防水带使用同一个视频
+        })
+    }
+    if (foamGunInUse) {
+        videosToPlay.push({
+            id: foamGunInUse.id,
+            name: foamGunInUse.name,
+            type: '泡沫喷枪',
+            videoUrl: deviceVideoMap['泡沫喷枪']
+        })
     }
 
-    // 同时检查两个区域，尽可能并行播放
-    let processed = false
-
-    // 检查左侧区域是否空闲
-    if (!currentPlayingVideos.value.left && videoPlayQueue.value.length > 0) {
-        const nextVideo = videoPlayQueue.value.shift()
-        console.log(`▶️ 左侧区域开始播放:`, nextVideo.name, '(优先级:', nextVideo.priority, ')', '视频路径:', nextVideo.videoUrl)
-        console.log(`📋 队列剩余:`, videoPlayQueue.value.length, '个视频')
-        playVideoInArea('left', nextVideo)
-        processed = true
+    if (videosToPlay.length > 0) {
+        // 有视频需要播放
+        if (videosToPlay.length === 1) {
+            // 只有一个视频，直接播放
+            if (!currentPlayingVideos.value.right || 
+                currentPlayingVideos.value.right.id !== videosToPlay[0].id) {
+                console.log('💧 右侧区域播放单个视频:', videosToPlay[0].name)
+                stopRightAreaRotation()
+                playVideoInArea('right', videosToPlay[0])
+            }
+        } else {
+            // 多个视频，需要轮播
+            console.log('💧 右侧区域开始轮播视频:', videosToPlay.map(v => v.name).join(', '))
+            startRightAreaRotation(videosToPlay)
+        }
+    } else {
+        // 没有视频需要播放，恢复监控流
+        if (currentPlayingVideos.value.right) {
+            console.log('💧 右侧区域停止播放视频，恢复监控流')
+            stopRightAreaRotation()
+            stopVideoAndRestoreStream('right')
+        }
     }
+}
 
-    // 检查右侧区域是否空闲（即使左侧刚开始播放，右侧也可以同时开始）
-    if (!currentPlayingVideos.value.right && videoPlayQueue.value.length > 0) {
-        const nextVideo = videoPlayQueue.value.shift()
-        console.log(`▶️ 右侧区域开始播放:`, nextVideo.name, '(优先级:', nextVideo.priority, ')', '视频路径:', nextVideo.videoUrl)
-        console.log(`📋 队列剩余:`, videoPlayQueue.value.length, '个视频')
-        playVideoInArea('right', nextVideo)
-        processed = true
+// 开始右侧区域视频轮播
+const startRightAreaRotation = (videos) => {
+    if (isUnmounted.value) return
+    
+    // 停止之前的轮播
+    stopRightAreaRotation()
+    
+    // 更新轮播队列
+    rightAreaVideoQueue.value = videos
+    rightAreaCurrentIndex.value = 0
+    
+    // 播放第一个视频
+    if (videos.length > 0) {
+        playVideoInArea('right', videos[0])
+        
+        // 如果有多个视频，设置轮播定时器
+        if (videos.length > 1) {
+            rightAreaPlayTimer = setInterval(() => {
+                if (isUnmounted.value) {
+                    stopRightAreaRotation()
+                    return
+                }
+                
+                rightAreaCurrentIndex.value = (rightAreaCurrentIndex.value + 1) % rightAreaVideoQueue.value.length
+                const nextVideo = rightAreaVideoQueue.value[rightAreaCurrentIndex.value]
+                console.log('💧 右侧区域轮播到下一个视频:', nextVideo.name)
+                playVideoInArea('right', nextVideo)
+            }, 10000) // 每10秒切换一次
+        }
     }
+}
 
-    // 如果两个区域都在播放，等待
-    if (currentPlayingVideos.value.left && currentPlayingVideos.value.right && videoPlayQueue.value.length > 0) {
-        console.log('⏸️ 两个区域都在播放视频，队列中还有', videoPlayQueue.value.length, '个视频等待')
+// 停止右侧区域视频轮播
+const stopRightAreaRotation = () => {
+    if (rightAreaPlayTimer) {
+        clearInterval(rightAreaPlayTimer)
+        rightAreaPlayTimer = null
     }
+    rightAreaVideoQueue.value = []
+    rightAreaCurrentIndex.value = 0
+}
 
-    // 如果还有视频在队列中但两个区域都在播放，等待其中一个完成
-    if (videoPlayQueue.value.length > 0 && currentPlayingVideos.value.left && currentPlayingVideos.value.right) {
-        console.log('⏸️ 两个区域都在播放，等待视频完成后继续处理队列')
-        // 不需要设置定时器，视频结束时会自动调用processVideoQueue
-    } else if (processed && videoPlayQueue.value.length > 0) {
-        // 如果有区域开始播放且队列中还有视频，但不是两个区域都在播放，继续处理
-        console.log('🔄 继续处理剩余队列，延迟100ms后再次调用processVideoQueue')
-        setTimeout(() => processVideoQueue(), 100)
-    }
-
-    console.log('✅ processVideoQueue执行完成')
+// 停止视频播放并恢复监控流
+const stopVideoAndRestoreStream = (area) => {
+    if (isUnmounted.value) return
+    
+    // 清除当前播放的视频信息
+    currentPlayingVideos.value[area] = null
+    
+    // 停止视频播放
+    stopVideoStream(area)
+    
+    // 恢复监控流
+    nextTick(() => {
+        restoreMonitorStream(area)
+    })
 }
 
 // 在指定区域播放视频
 const playVideoInArea = async (position, videoInfo) => {
     if (isUnmounted.value) return
 
-    // 检查该区域是否已经在播放视频
-    if (currentPlayingVideos.value[position]) {
-        console.warn(`⚠️ ${position}区域已在播放视频: ${currentPlayingVideos.value[position].name}，跳过新视频: ${videoInfo.name}`)
-        // 将视频重新加入队列头部，等待下次处理
-        videoPlayQueue.value.unshift(videoInfo)
+    // 如果该区域已经在播放相同的视频，直接返回
+    if (currentPlayingVideos.value[position] && 
+        currentPlayingVideos.value[position].id === videoInfo.id) {
+        console.log(`📺 ${position}区域已在播放相同视频: ${videoInfo.name}，无需重复播放`)
         return
     }
 
@@ -581,24 +628,18 @@ const onVideoEnded = (position) => {
         videoStreams.value[position].videoUrl = null
     }
 
-    // 延迟处理，确保状态更新完成
+    // 对于右侧区域，如果是轮播模式，不需要恢复监控流，轮播会自动处理
+    if (position === 'right' && rightAreaVideoQueue.value.length > 1) {
+        console.log(`💧 右侧区域轮播视频结束，等待轮播定时器处理下一个视频`)
+        return
+    }
+
+    // 延迟恢复监控流
     setTimeout(() => {
         if (isUnmounted.value) return
-
-        console.log(`🔄 ${position}区域准备处理下一个视频，队列长度:`, videoPlayQueue.value.length)
-
-        if (videoPlayQueue.value.length > 0) {
-            console.log(`📋 继续处理队列中的视频`)
-            processVideoQueue()
-        } else {
-            // 队列为空，立即恢复该区域的监控流
-            console.log(`📺 ${position}区域队列为空，立即恢复监控流`)
-            setTimeout(() => {
-                if (isUnmounted.value) return
-                restoreMonitorStream(position)
-            }, 500) // 延迟500ms恢复监控流
-        }
-    }, 200) // 延迟200ms处理队列
+        console.log(`📺 ${position}区域恢复监控流`)
+        restoreMonitorStream(position)
+    }, 500)
 }
 
 // 视频播放错误处理
@@ -638,21 +679,12 @@ const onVideoError = (position, videoInfo) => {
         console.warn(`清理${position}区域视频元素时出错:`, error)
     }
 
-    // 延迟处理队列，避免立即重试导致的问题
+    // 延迟恢复监控流
     setTimeout(() => {
         if (isUnmounted.value) return
 
-        console.log(`🔄 ${position}区域错误处理完成，检查队列`)
-
-        // 继续处理队列或恢复监控
-        if (videoPlayQueue.value.length > 0) {
-            console.log(`📋 队列中还有${videoPlayQueue.value.length}个视频，继续处理`)
-            processVideoQueue()
-        } else {
-            // 队列为空，立即恢复该区域的监控流
-            console.log(`📺 ${position}区域队列为空，立即恢复监控流`)
-            restoreMonitorStream(position)
-        }
+        console.log(`🔄 ${position}区域错误处理完成，恢复监控流`)
+        restoreMonitorStream(position)
     }, 500) // 延迟500ms处理
 }
 
@@ -1655,9 +1687,6 @@ const updateDeviceGroups = () => {
             if (!device) return null
             const statusInfo = getDeviceStatus(device.currentStatus, device.name)
 
-            // 检查设备状态变化，触发视频播放
-            checkDeviceStatusForVideo(device)
-
             // 处理设备图标 - 优先使用API返回的icon字段
             let deviceIcon = miehuoImg // 默认图标
             if (device.icon) {
@@ -1697,53 +1726,25 @@ const updateDeviceGroups = () => {
         if (!isUnmounted.value && deviceGroups && deviceGroups.value !== undefined) {
             deviceGroups.value = groups
         }
+        
+        // 检查设备状态变化，触发固定区域视频播放
+        checkDeviceStatusForVideo(deviceStore.devices)
     } catch (error) {
         console.warn('更新设备分组时发生错误:', error)
     }
 }
 
-// 检查设备状态变化，触发视频播放
-const checkDeviceStatusForVideo = (device) => {
-    if (isUnmounted.value || !device) return
+// 检查设备状态变化，触发固定区域视频播放
+const checkDeviceStatusForVideo = (devices) => {
+    if (isUnmounted.value || !devices || !Array.isArray(devices)) return
 
-    const deviceType = getDeviceType(device.name)
-    if (!deviceType) return
-
-    // 检查设备状态是否为IN_USE
-    if (device.currentStatus === 'IN_USE') {
-        console.log(`检测到设备${device.name}状态为IN_USE，准备播放视频`)
-
-        // 检查是否已在队列中，避免重复添加
-        const existingIndex = videoPlayQueue.value.findIndex(item => item.id === device.id)
-        if (existingIndex === -1) {
-            // 优先使用设备实例映射，如果没有则使用设备类型映射
-            const videoUrl = deviceInstanceVideoMap[device.id] || deviceVideoMap[deviceType]
-            const videoInfo = {
-                id: device.id,
-                name: device.name,
-                type: deviceType,
-                videoUrl: videoUrl,
-                priority: devicePriority[deviceType],
-                timestamp: Date.now()
-            }
-
-            videoPlayQueue.value.push(videoInfo)
-            // 按优先级排序，优先级数字越小越优先（灭火器=1，消防水枪=2，泡沫喷枪=3）
-            videoPlayQueue.value.sort((a, b) => a.priority - b.priority)
-            console.log('📝 添加视频到队列:', videoInfo.name, '优先级:', videoInfo.priority)
-            console.log('📋 当前队列:', videoPlayQueue.value.map(v => `${v.name}(优先级:${v.priority})`).join(', '))
-
-            // 延迟处理队列，避免并发问题
-            nextTick(() => {
-                processVideoQueue()
-            })
-        } else {
-            console.log('⚠️ 设备已在队列中，跳过添加:', device.name)
-        }
-    } else {
-        // 如果设备状态不是IN_USE，从队列中移除
-        removeFromVideoQueue(device.id)
-    }
+    console.log('🔍 检查设备状态，更新视频播放')
+    
+    // 更新左侧区域（灭火器专用）
+    updateLeftAreaVideo(devices)
+    
+    // 更新右侧区域（消防水枪/水带和泡沫喷枪）
+    updateRightAreaVideo(devices)
 }
 
 
@@ -2170,6 +2171,9 @@ onUnmounted(async () => {
     if (startupTimer) {
         clearTimeout(startupTimer)
     }
+    
+    // 清理右侧区域轮播定时器
+    stopRightAreaRotation()
 
 
 
