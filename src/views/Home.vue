@@ -330,10 +330,17 @@ const getDeviceType = (deviceName) => {
 const updateLeftAreaVideo = (devices) => {
     if (isUnmounted.value) return
 
+    console.log('🔥 检查左侧区域（灭火器）')
+
     // 检查是否有灭火器设备处于IN_USE状态
-    const fireExtinguisherInUse = devices.find(device => 
-        device.name.includes('灭火器') && device.currentStatus === 'IN_USE'
+    const fireExtinguisherDevices = devices.filter(device => device.name.includes('灭火器'))
+    console.log('🔥 灭火器设备:', fireExtinguisherDevices.map(d => ({ name: d.name, status: d.currentStatus })))
+
+    const fireExtinguisherInUse = devices.find(device =>
+        device.name.includes('灭火器') && device.currentStatus === 'IN_USE || WARNING'
     )
+
+    console.log('🔥 使用中的灭火器:', fireExtinguisherInUse ? fireExtinguisherInUse.name : '无')
 
     if (fireExtinguisherInUse) {
         // 如果有灭火器在使用，播放灭火器视频
@@ -346,12 +353,16 @@ const updateLeftAreaVideo = (devices) => {
                 videoUrl: deviceVideoMap['灭火器']
             }
             playVideoInArea('left', videoInfo)
+        } else {
+            console.log('🔥 左侧区域已在播放灭火器视频，无需重复播放')
         }
     } else {
         // 如果没有灭火器在使用，恢复监控流
         if (currentPlayingVideos.value.left) {
             console.log('🔥 左侧区域停止播放灭火器视频，恢复监控流')
             stopVideoAndRestoreStream('left')
+        } else {
+            console.log('🔥 左侧区域无需操作，已是监控流状态')
         }
     }
 }
@@ -360,16 +371,28 @@ const updateLeftAreaVideo = (devices) => {
 const updateRightAreaVideo = (devices) => {
     if (isUnmounted.value) return
 
+    console.log('💧 检查右侧区域（消防水枪/水带和泡沫喷枪）')
+
     // 检查消防水枪或消防水带是否处于IN_USE状态
-    const waterGunOrHoseInUse = devices.find(device => 
-        (device.name.includes('消防水枪') || device.name.includes('消防水带')) && 
-        device.currentStatus === 'IN_USE'
+    const waterDevices = devices.filter(device =>
+        device.name.includes('消防水枪') || device.name.includes('消防水带')
     )
+    console.log('💧 消防水枪/水带设备:', waterDevices.map(d => ({ name: d.name, status: d.currentStatus })))
+
+    const waterGunOrHoseInUse = devices.find(device =>
+        (device.name.includes('消防水枪') || device.name.includes('消防水带')) &&
+        device.currentStatus === 'IN_USE || WARNING'
+    )
+    console.log('💧 使用中的消防水枪/水带:', waterGunOrHoseInUse ? waterGunOrHoseInUse.name : '无')
 
     // 检查泡沫喷枪是否处于IN_USE状态
-    const foamGunInUse = devices.find(device => 
-        device.name.includes('泡沫喷枪') && device.currentStatus === 'IN_USE'
+    const foamDevices = devices.filter(device => device.name.includes('泡沫喷枪'))
+    console.log('💧 泡沫喷枪设备:', foamDevices.map(d => ({ name: d.name, status: d.currentStatus })))
+
+    const foamGunInUse = devices.find(device =>
+        device.name.includes('泡沫喷枪') && device.currentStatus === 'IN_USE || WARNING'
     )
+    console.log('💧 使用中的泡沫喷枪:', foamGunInUse ? foamGunInUse.name : '无')
 
     // 构建需要播放的视频列表
     const videosToPlay = []
@@ -394,7 +417,7 @@ const updateRightAreaVideo = (devices) => {
         // 有视频需要播放
         if (videosToPlay.length === 1) {
             // 只有一个视频，直接播放
-            if (!currentPlayingVideos.value.right || 
+            if (!currentPlayingVideos.value.right ||
                 currentPlayingVideos.value.right.id !== videosToPlay[0].id) {
                 console.log('💧 右侧区域播放单个视频:', videosToPlay[0].name)
                 stopRightAreaRotation()
@@ -418,18 +441,18 @@ const updateRightAreaVideo = (devices) => {
 // 开始右侧区域视频轮播
 const startRightAreaRotation = (videos) => {
     if (isUnmounted.value) return
-    
+
     // 停止之前的轮播
     stopRightAreaRotation()
-    
+
     // 更新轮播队列
     rightAreaVideoQueue.value = videos
     rightAreaCurrentIndex.value = 0
-    
+
     // 播放第一个视频
     if (videos.length > 0) {
         playVideoInArea('right', videos[0])
-        
+
         // 如果有多个视频，设置轮播定时器
         if (videos.length > 1) {
             rightAreaPlayTimer = setInterval(() => {
@@ -437,7 +460,7 @@ const startRightAreaRotation = (videos) => {
                     stopRightAreaRotation()
                     return
                 }
-                
+
                 rightAreaCurrentIndex.value = (rightAreaCurrentIndex.value + 1) % rightAreaVideoQueue.value.length
                 const nextVideo = rightAreaVideoQueue.value[rightAreaCurrentIndex.value]
                 console.log('💧 右侧区域轮播到下一个视频:', nextVideo.name)
@@ -460,13 +483,13 @@ const stopRightAreaRotation = () => {
 // 停止视频播放并恢复监控流
 const stopVideoAndRestoreStream = (area) => {
     if (isUnmounted.value) return
-    
+
     // 清除当前播放的视频信息
     currentPlayingVideos.value[area] = null
-    
+
     // 停止视频播放
     stopVideoStream(area)
-    
+
     // 恢复监控流
     nextTick(() => {
         restoreMonitorStream(area)
@@ -478,7 +501,7 @@ const playVideoInArea = async (position, videoInfo) => {
     if (isUnmounted.value) return
 
     // 如果该区域已经在播放相同的视频，直接返回
-    if (currentPlayingVideos.value[position] && 
+    if (currentPlayingVideos.value[position] &&
         currentPlayingVideos.value[position].id === videoInfo.id) {
         console.log(`📺 ${position}区域已在播放相同视频: ${videoInfo.name}，无需重复播放`)
         return
@@ -761,7 +784,9 @@ const startVideoStream = async (position) => {
         const response = await request.get(url)
 
         if (response.data?.success && response.data?.hlsUrl) {
-            const baseUrl = '127.0.0.1:8061'
+            const baseUrl = process.env.NODE_ENV === 'production' 
+                ? (process.env.VITE_API_BASE_URL || 'http://127.0.0.1:8061')
+                : 'http://localhost:5174'
             const fullHlsUrl = response.data.hlsUrl.startsWith('http')
                 ? response.data.hlsUrl
                 : `${baseUrl}${response.data.hlsUrl}`
@@ -1046,8 +1071,9 @@ const fetchCustomDeviceInfo = async () => {
                     displayPath = iconPath
                 } else {
                     // 生产环境：使用127.0.0.1“8061拼接完整的服务器地址
+                    const apiBaseUrl = process.env.VITE_API_BASE_URL || 'http://127.0.0.1:8061'
                     displayPath = iconPath.startsWith('http') ? iconPath :
-                        `127.0.0.1:8061${iconPath}`
+                        `${apiBaseUrl}${iconPath}`
                 }
             }
 
@@ -1455,7 +1481,7 @@ const checkAlarmStatus = () => {
             deviceStore.devices.some(device => device?.currentStatus === 'ALARM') : false
 
         const hasDeviceWarning = Array.isArray(deviceStore.devices) ?
-            deviceStore.devices.some(device => device?.currentStatus === 'WARNING') : false
+            deviceStore.devices.some(device => device?.currentStatus === 'WARNING' || device?.currentStatus === 'IN_USE') : false
 
         console.log('设备ALARM状态:', hasDeviceAlarm)
         console.log('设备WARNING状态:', hasDeviceWarning)
@@ -1575,8 +1601,9 @@ const getDeviceStatus = (currentStatus, deviceName) => {
                 return { status: 'online', statusText: '关闭' }
             case 'IN_USE':
             case 'WARNING':
-            case 'ALARM':
                 return { status: 'maintenance', statusText: '开' }
+            case 'ALARM':
+                return { status: 'fault', statusText: '缺失' }
             default:
                 return { status: 'online', statusText: '关闭' }
         }
@@ -1692,11 +1719,12 @@ const updateDeviceGroups = () => {
             if (device.icon) {
                 // 如果API返回了icon字段，优先使用
                 if (process.env.NODE_ENV === 'development') {
-                    // 开发环境：使用test.junhekh.cn:8061拼接完整路径
-                    deviceIcon = device.icon.startsWith('http') ? device.icon : `http://test.junhekh.cn:8061${device.icon}`
+                    // 开发环境：使用192.168.1.200:8061拼接完整路径
+                deviceIcon = device.icon.startsWith('http') ? device.icon : `http://192.168.1.200:8061${device.icon}`
                 } else {
                     // 生产环境：使用127.0.0.1“8061拼接完整路径
-                    deviceIcon = device.icon.startsWith('http') ? device.icon : `127.0.0.1:8061${device.icon}`
+                    const apiBaseUrl = process.env.VITE_API_BASE_URL || 'http://127.0.0.1:8061'
+                    deviceIcon = device.icon.startsWith('http') ? device.icon : `${apiBaseUrl}${device.icon}`
                 }
             } else {
                 // 如果API没有返回icon字段，使用代码中定义的映射
@@ -1726,7 +1754,7 @@ const updateDeviceGroups = () => {
         if (!isUnmounted.value && deviceGroups && deviceGroups.value !== undefined) {
             deviceGroups.value = groups
         }
-        
+
         // 检查设备状态变化，触发固定区域视频播放
         checkDeviceStatusForVideo(deviceStore.devices)
     } catch (error) {
@@ -1739,10 +1767,11 @@ const checkDeviceStatusForVideo = (devices) => {
     if (isUnmounted.value || !devices || !Array.isArray(devices)) return
 
     console.log('🔍 检查设备状态，更新视频播放')
-    
+    console.log('📊 设备数据:', devices.map(d => ({ name: d.name, status: d.currentStatus })))
+
     // 更新左侧区域（灭火器专用）
     updateLeftAreaVideo(devices)
-    
+
     // 更新右侧区域（消防水枪/水带和泡沫喷枪）
     updateRightAreaVideo(devices)
 }
@@ -1972,13 +2001,14 @@ const handleUploadSuccess = (response, file) => {
         settingsForm.value.uploadedImage = response.path
         // 根据环境处理图片显示路径
         if (process.env.NODE_ENV === 'development') {
-            // 开发环境：使用test.junhekh.cn:8061拼接完整的服务器地址
-            settingsForm.value.uploadedImageUrl = response.path.startsWith('http') ?
-                response.path : `http://test.junhekh.cn:8061${response.path}`
+            // 开发环境：使用192.168.1.200:8061拼接完整的服务器地址
+                        settingsForm.value.uploadedImageUrl = response.path.startsWith('http') ?
+                        response.path : `http://192.168.1.200:8061${response.path}`
         } else {
             // 生产环境：使用127.0.0.1“8061拼接完整的服务器地址
+            const apiBaseUrl = process.env.VITE_API_BASE_URL || 'http://127.0.0.1:8061'
             settingsForm.value.uploadedImageUrl = response.path.startsWith('http') ?
-                response.path : `127.0.0.1:8061${response.path}`
+                response.path : `${apiBaseUrl}${response.path}`
         }
         // 拼接完整路径用于接口传参
         fullImagePath.value = `${API_CONFIG.BASE_URL}${response.path}`
@@ -2171,7 +2201,7 @@ onUnmounted(async () => {
     if (startupTimer) {
         clearTimeout(startupTimer)
     }
-    
+
     // 清理右侧区域轮播定时器
     stopRightAreaRotation()
 

@@ -24,7 +24,7 @@ export default defineConfig({
         cors: true,
         proxy: {
             '/fire-monitor': {
-                target: 'http://test.junhekh.cn:8061',
+                target: process.env.VITE_API_TARGET || 'http://192.168.1.200:8061',
                 changeOrigin: true,
                 secure: false,
                 ws: false,
@@ -60,7 +60,7 @@ export default defineConfig({
             },
             // 图片资源代理配置
             '/home': {
-                target: 'http://test.junhekh.cn:8061',
+                target: process.env.VITE_API_TARGET || 'http://192.168.1.200:8061',
                 changeOrigin: true,
                 secure: false,
                 configure: (proxy, options) => {
@@ -88,7 +88,7 @@ export default defineConfig({
                 }
             },
             '/ws': {
-                target: 'ws://test.junhekh.cn:8061',
+                target: (process.env.VITE_API_TARGET || 'http://192.168.1.200:8061').replace('http', 'ws'),
                 ws: true,
                 changeOrigin: true
             }

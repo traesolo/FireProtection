@@ -3,7 +3,8 @@ import axios from 'axios'
 // 根据环境配置不同的API地址
 const getBaseURL = () => {
     if (process.env.NODE_ENV === 'production') {
-        return '127.0.0.1:8061'
+        // 生产环境：优先使用环境变量，否则使用默认的192.168.1.200
+        return process.env.VITE_API_BASE_URL || 'http://127.0.0.1:8061'
     } else {
         // 开发环境使用相对路径，通过Vite代理转发
         return ''

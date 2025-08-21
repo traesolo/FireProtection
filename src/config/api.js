@@ -1,6 +1,17 @@
 // API配置文件
+// 支持多个API地址配置
+const getApiBaseUrl = () => {
+    if (process.env.NODE_ENV === 'production') {
+        // 生产环境：优先使用环境变量，否则使用默认的192.168.1.200
+        return process.env.VITE_API_BASE_URL || 'http://127.0.0.1:8061'
+    } else {
+        // 开发环境使用相对路径，通过Vite代理转发
+        return ''
+    }
+}
+
 export const API_CONFIG = {
-    BASE_URL: process.env.NODE_ENV === 'production' ? '127.0.0.1:8061' : '',
+    BASE_URL: getApiBaseUrl(),
     ENDPOINTS: {
         // 设备参数相关
         THRESHOLDS: '/fire-monitor/api/config/thresholds',

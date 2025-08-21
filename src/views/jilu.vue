@@ -626,13 +626,14 @@ const fetchCustomDeviceInfo = async () => {
             // 如果有图片路径，根据环境处理显示路径
             if (iconPath) {
                 if (process.env.NODE_ENV === 'development') {
-                    // 开发环境：使用test.junhekh.cn:8061拼接完整的服务器地址
+                    // 开发环境：使用192.168.1.200:8061拼接完整的服务器地址
                     displayPath = iconPath.startsWith('http') ? iconPath :
-                        `http://test.junhekh.cn:8061${iconPath}`
+                        `http://192.168.1.200:8061${iconPath}`
                 } else {
                     // 生产环境：使用127.0.0.1“8061拼接完整的服务器地址
+                    const apiBaseUrl = process.env.VITE_API_BASE_URL || 'http://127.0.0.1:8061'
                     displayPath = iconPath.startsWith('http') ? iconPath :
-                        `127.0.0.1:8061${iconPath}`
+                        `${apiBaseUrl}${iconPath}`
                 }
             }
 
@@ -847,13 +848,14 @@ const handleUploadSuccess = (response, file) => {
         settingsForm.value.uploadedImage = response.path
         // 根据环境处理图片显示路径
         if (process.env.NODE_ENV === 'development') {
-            // 开发环境：使用test.junhekh.cn:8061拼接完整的服务器地址
+            // 开发环境：使用192.168.1.200:8061拼接完整的服务器地址
             settingsForm.value.uploadedImageUrl = response.path.startsWith('http') ?
-                response.path : `http://test.junhekh.cn:8061${response.path}`
+                response.path : `http://192.168.1.200:8061${response.path}`
         } else {
             // 生产环境：使用127.0.0.1“8061拼接完整的服务器地址
+            const apiBaseUrl = process.env.VITE_API_BASE_URL || 'http://127.0.0.1:8061'
             settingsForm.value.uploadedImageUrl = response.path.startsWith('http') ?
-                response.path : `127.0.0.1:8061${response.path}`
+                response.path : `${apiBaseUrl}${response.path}`
         }
         // 拼接完整路径用于接口传参
         fullImagePath.value = `${API_CONFIG.BASE_URL}${response.path}`
