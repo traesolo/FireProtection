@@ -344,9 +344,17 @@ const addToVideoQueue = (device) => {
         timestamp: Date.now()
     }
 
-    // 检查队列中是否已有相同类型的设备视频（按设备类型去重）
-    const existingTypeIndex = videoPlayQueue.value.findIndex(item => item.type === deviceType)
-    if (existingTypeIndex === -1) {
+    // 检查队列中是否已有包含相同关键字的设备视频（按设备名称关键字去重）
+    const hasExistingKeyword = videoPlayQueue.value.some(item => {
+        // 检查是否包含相同的关键字
+        if (device.name.includes('灭火器') && item.name.includes('灭火器')) return true
+        if (device.name.includes('消防水枪') && item.name.includes('消防水枪')) return true
+        if (device.name.includes('消防水带') && item.name.includes('消防水带')) return true
+        if (device.name.includes('泡沫喷枪') && item.name.includes('泡沫喷枪')) return true
+        return false
+    })
+    
+    if (!hasExistingKeyword) {
         videoPlayQueue.value.push(videoInfo)
         // 按优先级排序，优先级数字越小越优先（灭火器=1，消防水枪=2，泡沫喷枪=3）
         videoPlayQueue.value.sort((a, b) => a.priority - b.priority)
@@ -358,7 +366,7 @@ const addToVideoQueue = (device) => {
             processVideoQueue()
         })
     } else {
-        console.log('⚠️ 队列中已有相同类型设备视频，跳过添加:', device.name, '类型:', deviceType)
+        console.log('⚠️ 队列中已有包含相同关键字的设备视频，跳过添加:', device.name, '类型:', deviceType)
     }
 }
 
