@@ -632,7 +632,7 @@ const fetchCustomDeviceInfo = async () => {
                 } else {
                     // 生产环境：使用127.0.0.1“8061拼接完整的服务器地址
                     displayPath = iconPath.startsWith('http') ? iconPath :
-                        `http://127.0.0.1“8061${iconPath}`
+                        `127.0.0.1:8061${iconPath}`
                 }
             }
 
@@ -853,7 +853,7 @@ const handleUploadSuccess = (response, file) => {
         } else {
             // 生产环境：使用127.0.0.1“8061拼接完整的服务器地址
             settingsForm.value.uploadedImageUrl = response.path.startsWith('http') ?
-                response.path : `http://127.0.0.1“8061${response.path}`
+                response.path : `127.0.0.1:8061${response.path}`
         }
         // 拼接完整路径用于接口传参
         fullImagePath.value = `${API_CONFIG.BASE_URL}${response.path}`

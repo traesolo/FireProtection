@@ -344,17 +344,10 @@ const addToVideoQueue = (device) => {
         timestamp: Date.now()
     }
 
-    // 检查队列中是否已有包含相同关键字的设备视频（按设备名称关键字去重）
-    const hasExistingKeyword = videoPlayQueue.value.some(item => {
-        // 检查是否包含相同的关键字
-        if (device.name.includes('灭火器') && item.name.includes('灭火器')) return true
-        if (device.name.includes('消防水枪') && item.name.includes('消防水枪')) return true
-        if (device.name.includes('消防水带') && item.name.includes('消防水带')) return true
-        if (device.name.includes('泡沫喷枪') && item.name.includes('泡沫喷枪')) return true
-        return false
-    })
-    
-    if (!hasExistingKeyword) {
+    // 检查队列中是否已有相同类型的设备视频（按设备类型去重）
+    const hasExistingType = videoPlayQueue.value.some(item => item.type === deviceType)
+
+    if (!hasExistingType) {
         videoPlayQueue.value.push(videoInfo)
         // 按优先级排序，优先级数字越小越优先（灭火器=1，消防水枪=2，泡沫喷枪=3）
         videoPlayQueue.value.sort((a, b) => a.priority - b.priority)
@@ -366,7 +359,7 @@ const addToVideoQueue = (device) => {
             processVideoQueue()
         })
     } else {
-        console.log('⚠️ 队列中已有包含相同关键字的设备视频，跳过添加:', device.name, '类型:', deviceType)
+        console.log('⚠️ 队列中已有相同类型的设备视频，跳过添加:', device.name, '类型:', deviceType)
     }
 }
 
@@ -736,7 +729,7 @@ const startVideoStream = async (position) => {
         const response = await request.get(url)
 
         if (response.data?.success && response.data?.hlsUrl) {
-            const baseUrl = 'http://127.0.0.1:8061'
+            const baseUrl = '127.0.0.1:8061'
             const fullHlsUrl = response.data.hlsUrl.startsWith('http')
                 ? response.data.hlsUrl
                 : `${baseUrl}${response.data.hlsUrl}`
@@ -1022,7 +1015,7 @@ const fetchCustomDeviceInfo = async () => {
                 } else {
                     // 生产环境：使用127.0.0.1“8061拼接完整的服务器地址
                     displayPath = iconPath.startsWith('http') ? iconPath :
-                        `http://127.0.0.1“8061${iconPath}`
+                        `127.0.0.1:8061${iconPath}`
                 }
             }
 
@@ -1674,7 +1667,7 @@ const updateDeviceGroups = () => {
                     deviceIcon = device.icon.startsWith('http') ? device.icon : `http://test.junhekh.cn:8061${device.icon}`
                 } else {
                     // 生产环境：使用127.0.0.1“8061拼接完整路径
-                    deviceIcon = device.icon.startsWith('http') ? device.icon : `http://127.0.0.1“8061${device.icon}`
+                    deviceIcon = device.icon.startsWith('http') ? device.icon : `127.0.0.1:8061${device.icon}`
                 }
             } else {
                 // 如果API没有返回icon字段，使用代码中定义的映射
@@ -1984,7 +1977,7 @@ const handleUploadSuccess = (response, file) => {
         } else {
             // 生产环境：使用127.0.0.1“8061拼接完整的服务器地址
             settingsForm.value.uploadedImageUrl = response.path.startsWith('http') ?
-                response.path : `http://127.0.0.1“8061${response.path}`
+                response.path : `127.0.0.1:8061${response.path}`
         }
         // 拼接完整路径用于接口传参
         fullImagePath.value = `${API_CONFIG.BASE_URL}${response.path}`
