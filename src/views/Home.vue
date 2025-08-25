@@ -392,6 +392,18 @@ const getDeviceType = (deviceName) => {
 const updateLeftAreaVideo = (devices) => {
     if (isUnmounted.value) return
 
+    // 检查左侧区域是否正在播放视频，如果是则不进行状态更新
+    if (videoStreams.value?.left?.isPlayingVideo) {
+        console.log('⚠️ 左侧区域正在播放视频，跳过状态更新')
+        return
+    }
+
+    // 检查左侧区域是否有正在播放的视频，如果有则不进行状态更新
+    if (currentPlayingVideos.value.left) {
+        console.log('⚠️ 左侧区域有正在播放的视频，跳过状态更新')
+        return
+    }
+
     // 检查左侧区域（灭火器）
 
     // 检查是否有灭火器设备处于IN_USE状态
@@ -399,7 +411,7 @@ const updateLeftAreaVideo = (devices) => {
     // 静默处理灭火器设备状态
 
     const fireExtinguisherInUse = devices.find(device =>
-        device.name.includes('灭火器') && device.currentStatus === 'IN_USE || WARNING'
+        device.name.includes('灭火器') && (device.currentStatus === 'IN_USE' || device.currentStatus === 'WARNING')
     )
 
     // 静默处理使用中的灭火器
@@ -433,6 +445,18 @@ const updateLeftAreaVideo = (devices) => {
 const updateRightAreaVideo = (devices) => {
     if (isUnmounted.value) return
 
+    // 检查右侧区域是否正在播放视频，如果是则不进行状态更新
+    if (videoStreams.value?.right?.isPlayingVideo) {
+        console.log('⚠️ 右侧区域正在播放视频，跳过状态更新')
+        return
+    }
+
+    // 检查右侧区域是否有正在播放的视频，如果有则不进行状态更新
+    if (currentPlayingVideos.value.right) {
+        console.log('⚠️ 右侧区域有正在播放的视频，跳过状态更新')
+        return
+    }
+
     // 检查右侧区域（消防水枪/水带和泡沫喷枪）
 
     // 检查消防水枪或消防水带是否处于IN_USE状态
@@ -443,7 +467,7 @@ const updateRightAreaVideo = (devices) => {
 
     const waterGunOrHoseInUse = devices.find(device =>
         (device.name.includes('消防水枪') || device.name.includes('消防水带')) &&
-        device.currentStatus === 'IN_USE || WARNING'
+        (device.currentStatus === 'IN_USE' || device.currentStatus === 'WARNING')
     )
     // 静默处理使用中的消防水枪/水带
 
@@ -452,27 +476,37 @@ const updateRightAreaVideo = (devices) => {
     // 静默处理泡沫喷枪设备状态
 
     const foamGunInUse = devices.find(device =>
-        device.name.includes('泡沫喷枪') && device.currentStatus === 'IN_USE || WARNING'
+        device.name.includes('泡沫喷枪') && (device.currentStatus === 'IN_USE' || device.currentStatus === 'WARNING')
     )
     // 静默处理使用中的泡沫喷枪
 
-    // 构建需要播放的视频列表
+    // 构建需要播放的视频列表（去重，避免重复播放相同视频）
     const videosToPlay = []
+    const videoTypes = new Set() // 用于去重视频类型
+    
     if (waterGunOrHoseInUse) {
-        videosToPlay.push({
-            id: waterGunOrHoseInUse.id,
-            name: waterGunOrHoseInUse.name,
-            type: waterGunOrHoseInUse.name.includes('消防水枪') ? '消防水枪' : '消防水带',
-            videoUrl: deviceVideoMap['消防水枪'] // 消防水枪和消防水带使用同一个视频
-        })
+        const videoType = '消防水枪' // 消防水枪和消防水带使用同一个视频
+        if (!videoTypes.has(videoType)) {
+            videosToPlay.push({
+                id: waterGunOrHoseInUse.id,
+                name: waterGunOrHoseInUse.name,
+                type: waterGunOrHoseInUse.name.includes('消防水枪') ? '消防水枪' : '消防水带',
+                videoUrl: deviceVideoMap['消防水枪']
+            })
+            videoTypes.add(videoType)
+        }
     }
     if (foamGunInUse) {
-        videosToPlay.push({
-            id: foamGunInUse.id,
-            name: foamGunInUse.name,
-            type: '泡沫喷枪',
-            videoUrl: deviceVideoMap['泡沫喷枪']
-        })
+        const videoType = '泡沫喷枪'
+        if (!videoTypes.has(videoType)) {
+            videosToPlay.push({
+                id: foamGunInUse.id,
+                name: foamGunInUse.name,
+                type: '泡沫喷枪',
+                videoUrl: deviceVideoMap['泡沫喷枪']
+            })
+            videoTypes.add(videoType)
+        }
     }
 
     if (videosToPlay.length > 0) {
@@ -704,9 +738,7 @@ const onVideoEnded = (position) => {
     if (isUnmounted.value) return
 
     // 视频播放结束
-
-    // 清除当前播放的视频记录
-    currentPlayingVideos.value[position] = null
+    console.log(`📹 ${position}区域视频播放结束`)
 
     // 重置视频播放状态
     if (videoStreams.value && videoStreams.value[position]) {
@@ -720,12 +752,16 @@ const onVideoEnded = (position) => {
         return
     }
 
-    // 延迟恢复监控流
+    // 延迟清除当前播放的视频记录和恢复监控流，避免被立即重新触发
     setTimeout(() => {
         if (isUnmounted.value) return
+        
+        // 清除当前播放的视频记录
+        currentPlayingVideos.value[position] = null
+        
         // 区域恢复监控流
         restoreMonitorStream(position)
-    }, 500)
+    }, 500) // 缓冲时间降低到500ms，支持连续播放
 }
 
 // 视频播放错误处理
@@ -734,9 +770,6 @@ const onVideoError = (position, videoInfo) => {
 
     console.error(`❌ ${position}区域视频播放错误:`, videoInfo?.name || '未知视频')
     // 清理区域播放状态
-
-    // 清除当前播放的视频记录
-    currentPlayingVideos.value[position] = null
 
     // 重置视频播放状态
     if (videoStreams.value && videoStreams.value[position]) {
@@ -765,13 +798,16 @@ const onVideoError = (position, videoInfo) => {
         console.warn(`清理${position}区域视频元素时出错:`, error)
     }
 
-    // 延迟恢复监控流
+    // 延迟清除当前播放的视频记录和恢复监控流，避免被立即重新触发
     setTimeout(() => {
         if (isUnmounted.value) return
-
-        // 区域错误处理完成，恢复监控流
+        
+        // 清除当前播放的视频记录
+        currentPlayingVideos.value[position] = null
+        
+        // 区域恢复监控流
         restoreMonitorStream(position)
-    }, 500) // 延迟500ms处理
+    }, 500) // 缓冲时间降低到500ms，支持连续播放
 }
 
 // 恢复监控流
@@ -779,6 +815,12 @@ const restoreMonitorStream = async (position) => {
     if (isUnmounted.value) return
 
     // 恢复区域监控流
+
+    // 检查该区域是否仍在播放视频，如果是则不恢复监控流
+    if (videoStreams.value && videoStreams.value[position] && videoStreams.value[position].isPlayingVideo) {
+        console.log(`⚠️ ${position}区域仍在播放视频，跳过监控流恢复`)
+        return
+    }
 
     // 重置状态
     if (videoStreams.value && videoStreams.value[position]) {
@@ -842,6 +884,12 @@ const startVideoStream = async (position) => {
             return
         }
 
+        // 检查该区域是否正在播放视频，如果是则不启动监控流
+        if (videoStreams.value[position].isPlayingVideo) {
+            console.log(`⚠️ ${position}区域正在播放视频，跳过监控流启动`)
+            return
+        }
+
         videoStreams.value[position].loading = true
         videoStreams.value[position].error = null
         console.log(`📊 ${position}区域视频流状态设置为加载中`)
@@ -897,13 +945,30 @@ const startVideoStream = async (position) => {
             throw new Error('未获取到推流地址')
         }
 
+        // VIDEO_start接口请求完成后，等待5秒再使用streamUrl
+        console.log(`⏰ ${position}区域等待5秒后再获取流媒体地址...`)
+        logManager.addLog('info', `VIDEO_start接口调用完成，等待5秒后获取流媒体地址`, { 
+            deviceId: deviceName.value || '001', 
+            monitorArea: position === 'left' ? '左侧区域' : '右侧区域',
+            module: '视频监控',
+            cameraIndex
+        })
+        
+        await new Promise(resolve => setTimeout(resolve, 5000)) // 延迟5秒
+        
+        // 检查组件是否已卸载
+        if (isUnmounted.value) {
+            console.log(`⚠️ ${position}区域视频流启动被跳过：组件已卸载`)
+            return
+        }
+
         // const streamUrl = streamResponse.data.flvUrl
         // 根据摄像头位置配置不同的流媒体地址
         const streamUrl = position === 'left' 
             ? "http://192.168.1.200:8081/live.flv"  // 左侧区域摄像头
             : "http://192.168.1.200:8080/live.flv"  // 右侧区域摄像头
         console.log(`🎬 ${position}区域(cameraIndex=${cameraIndex})获取到流媒体地址:`, streamUrl)
-        logManager.addLog('info', `获取到流媒体地址: ${streamUrl}`, { 
+        logManager.addLog('info', `延迟5秒后获取到流媒体地址: ${streamUrl}`, { 
             deviceId: deviceName.value || '001', 
             monitorArea: position === 'left' ? '左侧区域' : '右侧区域',
             module: '视频监控',
@@ -1566,7 +1631,14 @@ const alarmState = ref({
     gainNode: null,
     warningAudioContext: null,
     warningOscillator: null,
-    warningGainNode: null
+    warningGainNode: null,
+    // 新增：用于存储上一次轮询的设备状态，用于对比
+    previousDeviceStates: [],
+    // 新增：报警轮数计数
+    alarmRoundCount: 0,
+    warningRoundCount: 0,
+    // 新增：最大报警轮数
+    maxAlarmRounds: 3
 })
 
 // 获取设备参数数据
@@ -1883,6 +1955,21 @@ const startAlarm = async () => {
 
     // 启动报警模式
     alarmState.value.isAlarming = true
+    // 重置轮数计数
+    alarmState.value.alarmRoundCount = 0
+
+    // 启动第一轮报警
+    startAlarmRound()
+}
+
+// 启动单轮报警
+const startAlarmRound = async () => {
+    if (!alarmState.value.isAlarming || alarmState.value.alarmRoundCount >= alarmState.value.maxAlarmRounds) {
+        stopAlarm()
+        return
+    }
+
+    alarmState.value.alarmRoundCount++
 
     // 启动蜂鸣器
     await createBeepSound()
@@ -1902,9 +1989,36 @@ const startAlarm = async () => {
         })
     }, 500) // 每500ms闪烁一次
 
-    // 10秒后自动停止报警
+    // 3秒后停止当前轮报警，并检查是否需要下一轮
     alarmState.value.alarmTimer = setTimeout(() => {
-        stopAlarm()
+        // 停止当前轮的蜂鸣器和闪烁
+        stopBeepSound()
+        if (alarmState.value.flashTimer) {
+            clearInterval(alarmState.value.flashTimer)
+            alarmState.value.flashTimer = null
+        }
+        // 移除闪烁样式
+        if (!isUnmounted.value) {
+            const monitorAreas = document.querySelectorAll('.monitor-area')
+            monitorAreas.forEach(area => {
+                if (area) {
+                    area.classList.remove('alarm-flash')
+                }
+            })
+        }
+        
+        // 检查是否需要下一轮报警
+        if (alarmState.value.alarmRoundCount < alarmState.value.maxAlarmRounds) {
+            // 等待1秒后开始下一轮
+            setTimeout(() => {
+                if (alarmState.value.isAlarming) {
+                    startAlarmRound()
+                }
+            }, 1000)
+        } else {
+            // 所有轮次完成，停止报警
+            stopAlarm()
+        }
     }, 10000)
 }
 
@@ -1914,6 +2028,21 @@ const startWarning = async () => {
 
     // 启动预警模式
     alarmState.value.isWarning = true
+    // 重置轮数计数
+    alarmState.value.warningRoundCount = 0
+
+    // 启动第一轮预警
+    startWarningRound()
+}
+
+// 启动单轮预警
+const startWarningRound = async () => {
+    if (!alarmState.value.isWarning || alarmState.value.warningRoundCount >= alarmState.value.maxAlarmRounds) {
+        stopWarning()
+        return
+    }
+
+    alarmState.value.warningRoundCount++
 
     // 启动预警蜂鸣器
     await createWarningBeepSound()
@@ -1933,9 +2062,36 @@ const startWarning = async () => {
         })
     }, 500) // 每500ms闪烁一次
 
-    // 10秒后自动停止预警
+    // 3秒后停止当前轮预警，并检查是否需要下一轮
     alarmState.value.warningTimer = setTimeout(() => {
-        stopWarning()
+        // 停止当前轮的预警蜂鸣器和闪烁
+        stopWarningBeepSound()
+        if (alarmState.value.warningFlashTimer) {
+            clearInterval(alarmState.value.warningFlashTimer)
+            alarmState.value.warningFlashTimer = null
+        }
+        // 移除预警闪烁样式
+        if (!isUnmounted.value) {
+            const monitorAreas = document.querySelectorAll('.monitor-area')
+            monitorAreas.forEach(area => {
+                if (area) {
+                    area.classList.remove('warning-flash')
+                }
+            })
+        }
+        
+        // 检查是否需要下一轮预警
+        if (alarmState.value.warningRoundCount < alarmState.value.maxAlarmRounds) {
+            // 等待1秒后开始下一轮
+            setTimeout(() => {
+                if (alarmState.value.isWarning) {
+                    startWarningRound()
+                }
+            }, 1000)
+        } else {
+            // 所有轮次完成，停止预警
+            stopWarning()
+        }
     }, 10000)
 }
 
@@ -1945,6 +2101,8 @@ const stopAlarm = () => {
 
     // 停止报警模式
     alarmState.value.isAlarming = false
+    // 重置轮数计数
+    alarmState.value.alarmRoundCount = 0
 
     // 停止蜂鸣器
     stopBeepSound()
@@ -1978,6 +2136,8 @@ const stopWarning = () => {
 
     // 停止预警模式
     alarmState.value.isWarning = false
+    // 重置轮数计数
+    alarmState.value.warningRoundCount = 0
 
     // 停止预警蜂鸣器
     stopWarningBeepSound()
@@ -2013,33 +2173,64 @@ const checkAlarmStatus = () => {
         return
     }
 
-    // 检查报警状态
-
     // 检查deviceStore是否有效
     if (!deviceStore) {
         console.warn('deviceStore无效，跳过报警状态检查')
         return
     }
 
-    // 静默处理设备数据
-    // 静默处理告警数据
-
     try {
-        // 只检查device数组中的状态
-        const hasDeviceAlarm = Array.isArray(deviceStore.devices) ?
-            deviceStore.devices.some(device => device?.currentStatus === 'ALARM') : false
+        // 获取当前设备状态
+        const currentDevices = Array.isArray(deviceStore.devices) ? deviceStore.devices : []
+        
+        // 创建当前设备状态的简化版本用于对比
+        const currentDeviceStates = currentDevices.map(device => ({
+            id: device?.id,
+            name: device?.name,
+            currentStatus: device?.currentStatus
+        }))
 
-        const hasDeviceWarning = Array.isArray(deviceStore.devices) ?
-            deviceStore.devices.some(device => device?.currentStatus === 'WARNING' || device?.currentStatus === 'IN_USE') : false
+        // 如果是第一次检查，直接保存当前状态，不触发报警
+        if (alarmState.value.previousDeviceStates.length === 0) {
+            alarmState.value.previousDeviceStates = JSON.parse(JSON.stringify(currentDeviceStates))
+            return
+        }
 
-        // 静默处理设备ALARM状态
-        // 静默处理设备WARNING状态
-        // 静默处理当前是否正在报警
-        // 静默处理当前是否正在预警
+        // 检查是否有新增的ALARM状态设备
+        const newAlarmDevices = []
+        const newWarningDevices = []
+        
+        currentDeviceStates.forEach(currentDevice => {
+            const previousDevice = alarmState.value.previousDeviceStates.find(prev => prev.id === currentDevice.id)
+            
+            if (previousDevice) {
+                // 检查ALARM状态：之前不是ALARM，现在是ALARM
+                if (previousDevice.currentStatus !== 'ALARM' && currentDevice.currentStatus === 'ALARM') {
+                    newAlarmDevices.push(currentDevice)
+                }
+                // 检查WARNING状态：之前不是WARNING/IN_USE，现在是WARNING/IN_USE
+                else if (!['WARNING', 'IN_USE'].includes(previousDevice.currentStatus) && 
+                        ['WARNING', 'IN_USE'].includes(currentDevice.currentStatus)) {
+                    newWarningDevices.push(currentDevice)
+                }
+            } else {
+                // 新设备，如果状态是ALARM或WARNING/IN_USE，也算作新增
+                if (currentDevice.currentStatus === 'ALARM') {
+                    newAlarmDevices.push(currentDevice)
+                } else if (['WARNING', 'IN_USE'].includes(currentDevice.currentStatus)) {
+                    newWarningDevices.push(currentDevice)
+                }
+            }
+        })
+
+        // 检查当前是否还有ALARM和WARNING状态的设备
+        const hasCurrentAlarm = currentDeviceStates.some(device => device.currentStatus === 'ALARM')
+        const hasCurrentWarning = currentDeviceStates.some(device => ['WARNING', 'IN_USE'].includes(device.currentStatus))
 
         // 处理ALARM状态（优先级最高）
-        if (hasDeviceAlarm && !alarmState.value?.isAlarming) {
-            // 触发设备报警
+        if (newAlarmDevices.length > 0 && !alarmState.value?.isAlarming) {
+            // 有新增ALARM设备，触发报警
+            console.log('检测到新增ALARM设备:', newAlarmDevices.map(d => d.name).join(', '))
             // 如果正在预警，先停止预警
             if (alarmState.value?.isWarning) {
                 stopWarning()
@@ -2047,23 +2238,30 @@ const checkAlarmStatus = () => {
             startAlarm().catch(error => {
                 console.error('启动报警失败:', error)
             })
-        } else if (!hasDeviceAlarm && alarmState.value?.isAlarming) {
-            // 停止设备报警
+        } else if (!hasCurrentAlarm && alarmState.value?.isAlarming) {
+            // 当前没有ALARM设备了，停止报警
+            console.log('所有ALARM设备已恢复，停止报警')
             stopAlarm()
         }
 
         // 处理WARNING状态（只有在没有ALARM时才处理）
-        if (!hasDeviceAlarm) {
-            if (hasDeviceWarning && !alarmState.value?.isWarning) {
-                // 触发设备预警
+        if (!hasCurrentAlarm) {
+            if (newWarningDevices.length > 0 && !alarmState.value?.isWarning) {
+                // 有新增WARNING设备，触发预警
+                console.log('检测到新增WARNING设备:', newWarningDevices.map(d => d.name).join(', '))
                 startWarning().catch(error => {
                     console.error('启动预警失败:', error)
                 })
-            } else if (!hasDeviceWarning && alarmState.value?.isWarning) {
-                // 停止设备预警
+            } else if (!hasCurrentWarning && alarmState.value?.isWarning) {
+                // 当前没有WARNING设备了，停止预警
+                console.log('所有WARNING设备已恢复，停止预警')
                 stopWarning()
             }
         }
+
+        // 更新上一次的设备状态
+        alarmState.value.previousDeviceStates = JSON.parse(JSON.stringify(currentDeviceStates))
+        
     } catch (error) {
         console.warn('检查报警状态时发生错误:', error)
     }

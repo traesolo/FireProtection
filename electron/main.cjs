@@ -193,19 +193,19 @@ function createWindow() {
   console.log('__dirname:', __dirname)
   console.log('app.getAppPath():', app.getAppPath())
   console.log('文件是否存在:', fs.existsSync(path.resolve(__dirname, '../dist/index.html')))
-  
+
   // 在asar环境中，检查文件存在性
   const distPath = path.resolve(__dirname, '../dist/index.html')
   console.log('完整路径:', distPath)
   console.log('是否为asar路径:', distPath.includes('.asar'))
-  
+
   // 如果是asar环境，直接使用相对路径
   if (distPath.includes('.asar')) {
     console.log('检测到asar环境，使用asar内部路径')
   }
-  
+
   console.log('准备加载页面:', startUrl)
-  
+
   mainWindow.loadURL(startUrl).then(() => {
     console.log('页面加载成功')
   }).catch(err => {
@@ -669,17 +669,17 @@ app.whenReady().then(async () => {
       try {
         // 清理所有视频流和资源
         cleanup()
-        
+
         // 设置强制退出标志
         global.forceQuit = true
         global.shortcutExit = true // 标记这是通过快捷键退出的
-        
+
         // 温和地关闭窗口
         if (mainWindow && !mainWindow.isDestroyed()) {
           mainWindow.webContents.closeDevTools()
           mainWindow.close()
         }
-        
+
         // 给一些时间让窗口正常关闭
         setTimeout(() => {
           // 如果窗口还没关闭，强制销毁
@@ -689,7 +689,7 @@ app.whenReady().then(async () => {
           // 退出应用
           app.quit()
         }, 1000)
-        
+
       } catch (error) {
         console.error('快捷键退出过程中发生错误:', error)
         // 如果出现错误，强制退出

@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import request from '../utils/request'
 import { API_CONFIG } from '../config/api'
+import { mockDeviceData, activateTestScenario } from '../utils/mockData'
 
 export const useDeviceStore = defineStore('device', {
   state: () => ({
@@ -43,11 +44,22 @@ export const useDeviceStore = defineStore('device', {
         return data
       } catch (error) {
         console.error('获取监控状态失败:', error)
-        // 发生错误时使用空数组，避免页面崩溃
+        
+        // API连接失败时，清空数据
         this.devices = []
         this.alarms = []
         throw error
       }
+    },
+
+    // 手动切换到模拟数据模式（用于测试）
+    useMockData() {
+      console.log('手动切换到模拟数据模式')
+      const mockData = activateTestScenario()
+      this.devices = mockData.devices
+      this.alarms = mockData.alarms
+      console.log('当前激活的设备:', mockData.devices.filter(d => d.currentStatus === 'IN_USE').map(d => d.name))
+      return mockData
     },
 
     // 开始轮询
