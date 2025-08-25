@@ -9,6 +9,9 @@ import 'element-plus/dist/index.css'
 import ElementPlus from 'element-plus'
 import zhCn from 'element-plus/dist/locale/zh-cn.mjs'
 
+// 日志重定向功能已移除
+console.log('应用启动')
+
 // Linux ARM64 输入框修复样式
 if (navigator.userAgent.includes('Linux') && (navigator.userAgent.includes('aarch64') || navigator.userAgent.includes('arm64'))) {
     import('./assets/linux-arm64-fix.css')

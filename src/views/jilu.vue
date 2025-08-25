@@ -356,7 +356,7 @@ const getDeviceStatus = (currentStatus, deviceName) => {
 
 // 告警状态映射函数（用于表格显示）
 const getAlarmStatusText = (alarmType, deviceName) => {
-    console.log('getAlarmStatusText called with:', { alarmType, deviceName })
+    // 静默处理告警状态文本获取
     // 根据设备名称确定设备类型
     const isWaterHose = deviceName && deviceName.includes('消防水带')
     const isFireExtinguisher = deviceName && deviceName.includes('灭火器')
@@ -461,8 +461,8 @@ const fetchAlarmData = async () => {
         const data = response.data || { devices: [], alarms: [] }
 
         // 使用alarms数据作为告警数据
-        console.log('接口返回的数据:', data)
-        console.log('alarms数组:', data.alarms)
+        // 静默处理接口返回数据
+        // 静默处理告警数组
         allAlarms.value = data.alarms || []
         filteredAlarms.value = [...allAlarms.value]
         total.value = filteredAlarms.value.length
@@ -626,9 +626,9 @@ const fetchCustomDeviceInfo = async () => {
             // 如果有图片路径，根据环境处理显示路径
             if (iconPath) {
                 if (process.env.NODE_ENV === 'development') {
-                    // 开发环境：使用192.168.1.200:8061拼接完整的服务器地址
+                    // 开发环境：使用127.0.0.1:8061拼接完整的服务器地址
                     displayPath = iconPath.startsWith('http') ? iconPath :
-                        `http://192.168.1.200:8061${iconPath}`
+                        `http://127.0.0.1:8061${iconPath}`
                 } else {
                     // 生产环境：使用127.0.0.1“8061拼接完整的服务器地址
                     const apiBaseUrl = process.env.VITE_API_BASE_URL || 'http://127.0.0.1:8061'
@@ -665,7 +665,7 @@ const saveThresholds = async () => {
             name: String(settingsForm.value.name || '')
         }
         await request.put(API_CONFIG.ENDPOINTS.THRESHOLDS, thresholdsData)
-        console.log('设备参数保存成功')
+        // 设备参数保存成功
     } catch (error) {
         console.error('保存设备参数失败:', error)
     }
@@ -679,7 +679,7 @@ const saveStationNumber = async () => {
         stationMap.set('stationNumber', parseInt(settingsForm.value.stationNumber) || 1)
         const stationData = Object.fromEntries(stationMap)
         await request.post(API_CONFIG.ENDPOINTS.STATION, stationData)
-        console.log('设备号保存成功')
+        // 设备号保存成功
     } catch (error) {
         console.error('保存设备号失败:', error)
     }
@@ -695,7 +695,7 @@ const saveCustomDeviceInfo = async () => {
             icon: fullImagePath.value || ''
         }
         await request.post(API_CONFIG.ENDPOINTS.CUSTOM_DEVICE_SAVE, customDeviceData)
-        console.log('自定义设备信息保存成功')
+        // 自定义设备信息保存成功
     } catch (error) {
         console.error('保存自定义设备信息失败:', error)
     }
@@ -743,7 +743,7 @@ const closeDialog = () => {
 
 // 确认登录
 const handleConfirm = async () => {
-    console.log('登录信息:', loginForm.value)
+    // 静默处理登录信息
 
     // 验证账号密码
     const isValid = await verifyPassword(loginForm.value.username, loginForm.value.password)
@@ -842,15 +842,15 @@ const beforeUpload = (file) => {
 
 // 图片上传成功处理
 const handleUploadSuccess = (response, file) => {
-    console.log('上传成功:', response)
+    // 上传成功
     if (response && response.path) {
         // 保存原始路径
         settingsForm.value.uploadedImage = response.path
         // 根据环境处理图片显示路径
         if (process.env.NODE_ENV === 'development') {
-            // 开发环境：使用192.168.1.200:8061拼接完整的服务器地址
+            // 开发环境：使用127.0.0.1:8061拼接完整的服务器地址
             settingsForm.value.uploadedImageUrl = response.path.startsWith('http') ?
-                response.path : `http://192.168.1.200:8061${response.path}`
+                response.path : `http://127.0.0.1:8061${response.path}`
         } else {
             // 生产环境：使用127.0.0.1“8061拼接完整的服务器地址
             const apiBaseUrl = process.env.VITE_API_BASE_URL || 'http://127.0.0.1:8061'

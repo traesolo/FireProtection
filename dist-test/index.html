@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: file: https://cdn.jsdelivr.net; script-src 'self' 'unsafe-inline' 'unsafe-eval' file: https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' file:; font-src 'self' data: file:; img-src 'self' data: blob: file:; media-src 'self' data: blob: file:; connect-src 'self' https: http: ws: wss: file:;" />
+    <title>消防设备终端</title>
+    <!-- 字体配置 -->
+    <style>
+      @font-face {
+        font-family: 'Source Han Sans CN';
+        src: url('fonts/SourceHanSancCN/SourceHanSansCN-VF.ttf.woff2') format('woff2'),
+             url('fonts/SourceHanSancCN/SourceHanSansSC-VF.ttf') format('truetype');
+        font-weight: 100 900;
+        font-style: normal;
+        font-display: swap;
+      }
+      
+      @font-face {
+        font-family: 'YouSheBiaoTiHei';
+        src: url('fonts/YouSheBiaoTiHei/YouSheBiaoTiHei-2.ttf') format('truetype');
+        font-weight: normal;
+        font-style: normal;
+        font-display: swap;
+      }
+      
+      body {
+        font-family: 'Source Han Sans CN', system-ui, Avenir, Helvetica, Arial, sans-serif;
+      }
+    </style>
+    <!-- HLS.js 视频播放库 -->
+    <!-- <script src="/hls.min.js"></script> -->
+     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <script type="module" crossorigin src="./assets/index-96379a24.js"></script>
+    <link rel="stylesheet" href="./assets/index-5ecbddd4.css">
+  </head>
+  <body>
+    <div id="app"></div>
+    
+  </body>
+</html>

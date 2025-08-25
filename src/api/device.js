@@ -3,74 +3,74 @@ import request from '../utils/request'
 import { API_CONFIG } from '../config/api'
 
 export const useDeviceStore = defineStore('device', {
-    state: () => ({
-        devices: [],
-        alarms: [],
-        isPolling: false,
-        pollingInterval: null
-    }),
+  state: () => ({
+    devices: [],
+    alarms: [],
+    isPolling: false,
+    pollingInterval: null
+  }),
 
-    getters: {
-        getDeviceById: (state) => (id) => {
-            return state.devices.find(device => device.id === id)
-        },
-        getActiveAlarms: (state) => {
-            return state.alarms.filter(alarm => alarm.status === 'active')
-        },
-        getDevicesByStatus: (state) => (status) => {
-            return state.devices.filter(device => device.currentStatus === status)
+  getters: {
+    getDeviceById: (state) => (id) => {
+      return state.devices.find(device => device.id === id)
+    },
+    getActiveAlarms: (state) => {
+      return state.alarms.filter(alarm => alarm.status === 'active')
+    },
+    getDevicesByStatus: (state) => (status) => {
+      return state.devices.filter(device => device.currentStatus === status)
+    }
+  },
+
+  actions: {
+    // 获取监控状态数据
+    async fetchMonitorStatus() {
+      try {
+        console.log('获取真实设备状态数据')
+
+        // 调用真实的监控状态接口
+        const response = await request.get(API_CONFIG.ENDPOINTS.MONITOR_STATUS)
+        const data = response.data || { devices: [], alarms: [] }
+
+        console.log('设备状态数据:', data)
+        console.log('设备列表详情:', data.devices)
+        if (data.devices && data.devices.length > 0) {
+          console.log('设备名称列表:', data.devices.map(d => d.name))
+          console.log('设备ID列表:', data.devices.map(d => d.id))
         }
+        this.devices = data.devices || []
+        this.alarms = data.alarms || []
+        return data
+      } catch (error) {
+        console.error('获取监控状态失败:', error)
+        // 发生错误时使用空数组，避免页面崩溃
+        this.devices = []
+        this.alarms = []
+        throw error
+      }
     },
 
-    actions: {
-        // 获取监控状态数据
-        async fetchMonitorStatus() {
-            try {
-                console.log('获取真实设备状态数据')
+    // 开始轮询
+    startPolling() {
+      if (this.isPolling) return
 
-                // 调用真实的监控状态接口
-                const response = await request.get(API_CONFIG.ENDPOINTS.MONITOR_STATUS)
-                const data = response.data || { devices: [], alarms: [] }
+      this.isPolling = true
+      // 立即执行一次
+      this.fetchMonitorStatus()
 
-                console.log('设备状态数据:', data)
-                console.log('设备列表详情:', data.devices)
-                if (data.devices && data.devices.length > 0) {
-                    console.log('设备名称列表:', data.devices.map(d => d.name))
-                    console.log('设备ID列表:', data.devices.map(d => d.id))
-                }
-                this.devices = data.devices || []
-                this.alarms = data.alarms || []
-                return data
-            } catch (error) {
-                console.error('获取监控状态失败:', error)
-                // 发生错误时使用空数组，避免页面崩溃
-                this.devices = []
-                this.alarms = []
-                throw error
-            }
-        },
+      // 每1秒轮询一次
+      this.pollingInterval = setInterval(() => {
+        this.fetchMonitorStatus()
+      }, 1000)
+    },
 
-        // 开始轮询
-        startPolling() {
-            if (this.isPolling) return
-
-            this.isPolling = true
-            // 立即执行一次
-            this.fetchMonitorStatus()
-
-            // 每1秒轮询一次
-            this.pollingInterval = setInterval(() => {
-                this.fetchMonitorStatus()
-            }, 1000)
-        },
-
-        // 停止轮询
-        stopPolling() {
-            if (this.pollingInterval) {
-                clearInterval(this.pollingInterval)
-                this.pollingInterval = null
-            }
-            this.isPolling = false
-        }
+    // 停止轮询
+    stopPolling() {
+      if (this.pollingInterval) {
+        clearInterval(this.pollingInterval)
+        this.pollingInterval = null
+      }
+      this.isPolling = false
     }
+  }
 })

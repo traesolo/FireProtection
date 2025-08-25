@@ -62,7 +62,7 @@
         </div>
         <div class="sehbeihao">
             <div class="left-item">
-                <div class="status-title">设备编号：{{ deviceName }}</div>
+                <div class="status-title device-number-clickable" @click="goToLogPage">设备编号：{{ deviceName }}</div>
                 <div class="status-subtitle" data-text="等管道泡沫度清洁后，再回收软管！">等管道泡沫度清洁后，再回收软管！</div>
             </div>
             <div class="right-item">
@@ -237,9 +237,9 @@ import html2canvas from 'html2canvas'
 import { useRouter } from 'vue-router'
 import { useDeviceStore } from '../api/device'
 import request from '../utils/request'
-import { API_CONFIG, buildUrl } from '../config/api'
-// VideoStreamManager已移除，直接使用接口获取视频流
-import Hls from 'hls.js'
+import { API_CONFIG, buildUrl, buildCameraUrl } from '../config/api'
+import flvjs from 'flv.js'
+import logManager from '@/utils/logManager.js'
 
 // 监控摄像头配置
 const monitorConfig = {
@@ -271,25 +271,87 @@ const monitorConfig = {
 // 组件卸载标志
 const isUnmounted = ref(false)
 
+// 播放器类型 - 支持多种播放器
+const PLAYER_TYPES = {
+    HTML5: 'html5',
+    FLV_JS: 'flv_js'
+}
+
+// 环境检测
+const detectEnvironment = () => {
+    const isElectron = typeof window !== 'undefined' && window.process && window.process.type
+    const isLinux = typeof window !== 'undefined' && window.navigator.platform.toLowerCase().includes('linux')
+    const isARM64 = typeof window !== 'undefined' && (window.navigator.userAgent.includes('aarch64') || window.navigator.userAgent.includes('arm64'))
+
+    console.log('🔍 环境检测结果:', {
+        isElectron,
+        isLinux,
+        isARM64,
+        platform: typeof window !== 'undefined' ? window.navigator.platform : 'unknown',
+        userAgent: typeof window !== 'undefined' ? window.navigator.userAgent : 'unknown'
+    })
+
+    return { isElectron, isLinux, isARM64 }
+}
+
+// 选择合适的播放器类型
+const getOptimalPlayerType = (streamUrl = '') => {
+    // 根据文件扩展名和URL特征选择播放器
+    const url = streamUrl.toLowerCase()
+
+    // FLV格式使用FLV.js播放器
+    if (url.includes('.flv') || url.includes('flv')) {
+        return PLAYER_TYPES.FLV_JS
+    }
+
+    // HTTP-FLV流媒体格式判断（ live参数）
+    if ((url.includes('live') || url.includes('app=live'))) {
+        return PLAYER_TYPES.FLV_JS
+    }
+
+    // MP4格式使用HTML5原生播放器
+    if (url.includes('.mp4') || url.includes('mp4')) {
+        return PLAYER_TYPES.HTML5
+    }
+
+    // 默认使用HTML5播放器
+    return PLAYER_TYPES.HTML5
+}
+
+// 当前播放器类型设置 - 根据环境自动选择
+const optimalPlayerType = getOptimalPlayerType()
+const playerSettings = ref({
+    left: optimalPlayerType,
+    right: optimalPlayerType
+})
+
 // 视频流状态
 const videoStreams = ref({
     left: {
-        active: false,
+        active: true,
         loading: false,
         error: null,
-        hlsUrl: null,
-        hlsInstance: null,
+        streamUrl: null,
+        videoElement: null, // HTML5 video元素
+        playerType: optimalPlayerType,
         isPlayingVideo: false,
-        videoUrl: null
+        videoUrl: null,
+        mediaErrorCount: 0,
+        healthCheckInterval: null,
+        stuckCount: 0
     },
     right: {
-        active: false,
+        active: true,
         loading: false,
         error: null,
-        hlsUrl: null,
-        hlsInstance: null,
+        streamUrl: null,
+        videoElement: null, // HTML5 video元素
+        playerType: optimalPlayerType,
         isPlayingVideo: false,
-        videoUrl: null
+        videoUrl: null,
+        mediaErrorCount: 0,
+        healthCheckInterval: null,
+        stuckCount: 0
     }
 })
 
@@ -330,22 +392,22 @@ const getDeviceType = (deviceName) => {
 const updateLeftAreaVideo = (devices) => {
     if (isUnmounted.value) return
 
-    console.log('🔥 检查左侧区域（灭火器）')
+    // 检查左侧区域（灭火器）
 
     // 检查是否有灭火器设备处于IN_USE状态
     const fireExtinguisherDevices = devices.filter(device => device.name.includes('灭火器'))
-    console.log('🔥 灭火器设备:', fireExtinguisherDevices.map(d => ({ name: d.name, status: d.currentStatus })))
+    // 静默处理灭火器设备状态
 
     const fireExtinguisherInUse = devices.find(device =>
         device.name.includes('灭火器') && device.currentStatus === 'IN_USE || WARNING'
     )
 
-    console.log('🔥 使用中的灭火器:', fireExtinguisherInUse ? fireExtinguisherInUse.name : '无')
+    // 静默处理使用中的灭火器
 
     if (fireExtinguisherInUse) {
         // 如果有灭火器在使用，播放灭火器视频
         if (!currentPlayingVideos.value.left || currentPlayingVideos.value.left.type !== '灭火器') {
-            console.log('🔥 左侧区域开始播放灭火器视频:', fireExtinguisherInUse.name)
+            // 左侧区域开始播放灭火器视频
             const videoInfo = {
                 id: fireExtinguisherInUse.id,
                 name: fireExtinguisherInUse.name,
@@ -354,15 +416,15 @@ const updateLeftAreaVideo = (devices) => {
             }
             playVideoInArea('left', videoInfo)
         } else {
-            console.log('🔥 左侧区域已在播放灭火器视频，无需重复播放')
+            // 左侧区域已在播放灭火器视频，无需重复播放
         }
     } else {
         // 如果没有灭火器在使用，恢复监控流
         if (currentPlayingVideos.value.left) {
-            console.log('🔥 左侧区域停止播放灭火器视频，恢复监控流')
+            // 左侧区域停止播放灭火器视频，恢复监控流
             stopVideoAndRestoreStream('left')
         } else {
-            console.log('🔥 左侧区域无需操作，已是监控流状态')
+            // 左侧区域无需操作，已是监控流状态
         }
     }
 }
@@ -371,28 +433,28 @@ const updateLeftAreaVideo = (devices) => {
 const updateRightAreaVideo = (devices) => {
     if (isUnmounted.value) return
 
-    console.log('💧 检查右侧区域（消防水枪/水带和泡沫喷枪）')
+    // 检查右侧区域（消防水枪/水带和泡沫喷枪）
 
     // 检查消防水枪或消防水带是否处于IN_USE状态
     const waterDevices = devices.filter(device =>
         device.name.includes('消防水枪') || device.name.includes('消防水带')
     )
-    console.log('💧 消防水枪/水带设备:', waterDevices.map(d => ({ name: d.name, status: d.currentStatus })))
+    // 静默处理消防水枪/水带设备状态
 
     const waterGunOrHoseInUse = devices.find(device =>
         (device.name.includes('消防水枪') || device.name.includes('消防水带')) &&
         device.currentStatus === 'IN_USE || WARNING'
     )
-    console.log('💧 使用中的消防水枪/水带:', waterGunOrHoseInUse ? waterGunOrHoseInUse.name : '无')
+    // 静默处理使用中的消防水枪/水带
 
     // 检查泡沫喷枪是否处于IN_USE状态
     const foamDevices = devices.filter(device => device.name.includes('泡沫喷枪'))
-    console.log('💧 泡沫喷枪设备:', foamDevices.map(d => ({ name: d.name, status: d.currentStatus })))
+    // 静默处理泡沫喷枪设备状态
 
     const foamGunInUse = devices.find(device =>
         device.name.includes('泡沫喷枪') && device.currentStatus === 'IN_USE || WARNING'
     )
-    console.log('💧 使用中的泡沫喷枪:', foamGunInUse ? foamGunInUse.name : '无')
+    // 静默处理使用中的泡沫喷枪
 
     // 构建需要播放的视频列表
     const videosToPlay = []
@@ -419,19 +481,19 @@ const updateRightAreaVideo = (devices) => {
             // 只有一个视频，直接播放
             if (!currentPlayingVideos.value.right ||
                 currentPlayingVideos.value.right.id !== videosToPlay[0].id) {
-                console.log('💧 右侧区域播放单个视频:', videosToPlay[0].name)
+                // 右侧区域播放单个视频
                 stopRightAreaRotation()
                 playVideoInArea('right', videosToPlay[0])
             }
         } else {
             // 多个视频，需要轮播
-            console.log('💧 右侧区域开始轮播视频:', videosToPlay.map(v => v.name).join(', '))
+            // 右侧区域开始轮播视频
             startRightAreaRotation(videosToPlay)
         }
     } else {
         // 没有视频需要播放，恢复监控流
         if (currentPlayingVideos.value.right) {
-            console.log('💧 右侧区域停止播放视频，恢复监控流')
+            // 右侧区域停止播放视频，恢复监控流
             stopRightAreaRotation()
             stopVideoAndRestoreStream('right')
         }
@@ -463,7 +525,7 @@ const startRightAreaRotation = (videos) => {
 
                 rightAreaCurrentIndex.value = (rightAreaCurrentIndex.value + 1) % rightAreaVideoQueue.value.length
                 const nextVideo = rightAreaVideoQueue.value[rightAreaCurrentIndex.value]
-                console.log('💧 右侧区域轮播到下一个视频:', nextVideo.name)
+                // 右侧区域轮播到下一个视频
                 playVideoInArea('right', nextVideo)
             }, 10000) // 每10秒切换一次
         }
@@ -503,12 +565,12 @@ const playVideoInArea = async (position, videoInfo) => {
     // 如果该区域已经在播放相同的视频，直接返回
     if (currentPlayingVideos.value[position] &&
         currentPlayingVideos.value[position].id === videoInfo.id) {
-        console.log(`📺 ${position}区域已在播放相同视频: ${videoInfo.name}，无需重复播放`)
+        // 区域已在播放相同视频，无需重复播放
         return
     }
 
     try {
-        console.log(`🎬 开始在${position}区域播放视频: ${videoInfo.name} -> ${videoInfo.videoUrl}`)
+        // 开始播放视频
 
         // 立即标记该区域为播放状态，防止并发
         currentPlayingVideos.value[position] = videoInfo
@@ -574,7 +636,7 @@ const playVideoInArea = async (position, videoInfo) => {
         // 设置事件监听器
         videoElement.onended = () => {
             if (isUnmounted.value) return
-            console.log(`✅ ${position}区域视频播放完成: ${videoInfo.name}`)
+            // 视频播放完成
             onVideoEnded(position)
         }
 
@@ -585,7 +647,7 @@ const playVideoInArea = async (position, videoInfo) => {
         }
 
         // 加载视频
-        console.log(`🎬 ${position}区域加载视频:`, videoInfo.videoUrl)
+        // 加载视频
         videoElement.src = videoInfo.videoUrl
         videoElement.load()
 
@@ -594,10 +656,10 @@ const playVideoInArea = async (position, videoInfo) => {
             const timeout = setTimeout(() => {
                 console.error(`❌ ${position}区域视频加载超时:`, videoInfo.videoUrl)
                 reject(new Error('视频加载超时'))
-            }, 10000) // 增加超时时间到10秒
+            }, 20000) // 增加超时时间到10秒
 
             videoElement.oncanplay = () => {
-                console.log(`✅ ${position}区域视频可以播放:`, videoInfo.name)
+                // 视频可以播放
                 clearTimeout(timeout)
                 resolve()
             }
@@ -609,7 +671,7 @@ const playVideoInArea = async (position, videoInfo) => {
             }
 
             videoElement.onloadstart = () => {
-                console.log(`🔄 ${position}区域开始加载视频:`, videoInfo.name)
+                // 开始加载视频
             }
         })
 
@@ -619,9 +681,10 @@ const playVideoInArea = async (position, videoInfo) => {
         // 播放视频
         try {
             await videoElement.play()
-            console.log(`✅ ${position}区域视频开始播放:`, videoInfo.name)
+            // 视频开始播放
         } catch (playError) {
             console.error(`❌ ${position}区域视频播放失败:`, playError)
+            // 视频播放失败
             throw playError
         }
 
@@ -640,7 +703,7 @@ const playVideoInArea = async (position, videoInfo) => {
 const onVideoEnded = (position) => {
     if (isUnmounted.value) return
 
-    console.log(`✅ ${position}区域视频播放结束`)
+    // 视频播放结束
 
     // 清除当前播放的视频记录
     currentPlayingVideos.value[position] = null
@@ -653,14 +716,14 @@ const onVideoEnded = (position) => {
 
     // 对于右侧区域，如果是轮播模式，不需要恢复监控流，轮播会自动处理
     if (position === 'right' && rightAreaVideoQueue.value.length > 1) {
-        console.log(`💧 右侧区域轮播视频结束，等待轮播定时器处理下一个视频`)
+        // 右侧区域轮播视频结束，等待轮播定时器处理下一个视频
         return
     }
 
     // 延迟恢复监控流
     setTimeout(() => {
         if (isUnmounted.value) return
-        console.log(`📺 ${position}区域恢复监控流`)
+        // 区域恢复监控流
         restoreMonitorStream(position)
     }, 500)
 }
@@ -670,7 +733,7 @@ const onVideoError = (position, videoInfo) => {
     if (isUnmounted.value) return
 
     console.error(`❌ ${position}区域视频播放错误:`, videoInfo?.name || '未知视频')
-    console.log(`🧹 清理${position}区域播放状态`)
+    // 清理区域播放状态
 
     // 清除当前播放的视频记录
     currentPlayingVideos.value[position] = null
@@ -706,7 +769,7 @@ const onVideoError = (position, videoInfo) => {
     setTimeout(() => {
         if (isUnmounted.value) return
 
-        console.log(`🔄 ${position}区域错误处理完成，恢复监控流`)
+        // 区域错误处理完成，恢复监控流
         restoreMonitorStream(position)
     }, 500) // 延迟500ms处理
 }
@@ -715,7 +778,7 @@ const onVideoError = (position, videoInfo) => {
 const restoreMonitorStream = async (position) => {
     if (isUnmounted.value) return
 
-    console.log(`恢复${position}区域监控流`)
+    // 恢复区域监控流
 
     // 重置状态
     if (videoStreams.value && videoStreams.value[position]) {
@@ -731,7 +794,7 @@ const restoreMonitorStream = async (position) => {
 
 // 安全的视频流状态访问器
 const safeVideoStreams = computed(() => {
-    const defaultStream = { active: false, loading: false, error: null, hlsUrl: null, hlsInstance: null, isPlayingVideo: false, videoUrl: null }
+    const defaultStream = { active: true, loading: false, error: null, streamUrl: null, isPlayingVideo: false, videoUrl: null }
 
     if (isUnmounted.value || !videoStreams.value) {
         return {
@@ -744,20 +807,18 @@ const safeVideoStreams = computed(() => {
     const streams = videoStreams.value
     return {
         left: {
-            active: streams.left?.active || false,
+            active: streams.left?.active ?? true,
             loading: streams.left?.loading || false,
             error: streams.left?.error || null,
-            hlsUrl: streams.left?.hlsUrl || null,
-            hlsInstance: streams.left?.hlsInstance || null,
+            streamUrl: streams.left?.streamUrl || null,
             isPlayingVideo: streams.left?.isPlayingVideo || false,
             videoUrl: streams.left?.videoUrl || null
         },
         right: {
-            active: streams.right?.active || false,
+            active: streams.right?.active ?? true,
             loading: streams.right?.loading || false,
             error: streams.right?.error || null,
-            hlsUrl: streams.right?.hlsUrl || null,
-            hlsInstance: streams.right?.hlsInstance || null,
+            streamUrl: streams.right?.streamUrl || null,
             isPlayingVideo: streams.right?.isPlayingVideo || false,
             videoUrl: streams.right?.videoUrl || null
         }
@@ -767,45 +828,140 @@ const safeVideoStreams = computed(() => {
 // 启动视频流
 const startVideoStream = async (position) => {
     const cameraIndex = position === 'left' ? 0 : 1
+    console.log(`🎬 启动${position}区域视频流，摄像头索引:${cameraIndex}`)
+    logManager.addLog('info', `启动${position}区域视频流，摄像头索引:${cameraIndex}`, { 
+        deviceId: deviceName.value || '001', 
+        monitorArea: position === 'left' ? '左侧区域' : '右侧区域',
+        module: '视频监控',
+        cameraIndex
+    })
 
     try {
         if (isUnmounted.value || !videoStreams.value?.[position]) {
-            console.log(`跳过启动视频流 ${position}: 组件已卸载或流对象不存在`)
+            console.log(`⚠️ ${position}区域视频流启动被跳过：组件已卸载或状态不存在`)
             return
         }
 
-        console.log(`开始启动视频流 ${position}, 摄像头索引: ${cameraIndex}`)
         videoStreams.value[position].loading = true
         videoStreams.value[position].error = null
+        console.log(`📊 ${position}区域视频流状态设置为加载中`)
+        // 播放器类型将在获取streamUrl后动态选择
 
-        // 调用接口获取视频流
-        const url = `${API_CONFIG.ENDPOINTS.VIDEO_STREAM}/${cameraIndex}`
-        console.log(`请求视频流接口: ${url}`)
-        const response = await request.get(url)
+        // 获取视频流地址
+        // 第一步：调用摄像头接口获取RTSP URL
+        const cameraUrl = buildCameraUrl(cameraIndex)
+        console.log('📡 调用摄像头接口:', cameraUrl)
+        logManager.addLog('info', `调用摄像头接口: ${cameraUrl}`, { 
+            deviceId: deviceName.value || '001', 
+            monitorArea: position === 'left' ? '左侧区域' : '右侧区域',
+            module: '视频监控',
+            cameraIndex,
+            cameraUrl
+        })
 
-        if (response.data?.success && response.data?.hlsUrl) {
-            const baseUrl = process.env.NODE_ENV === 'production' 
-                ? (process.env.VITE_API_BASE_URL || 'http://127.0.0.1:8061')
-                : 'http://localhost:5174'
-            const fullHlsUrl = response.data.hlsUrl.startsWith('http')
-                ? response.data.hlsUrl
-                : `${baseUrl}${response.data.hlsUrl}`
+        const cameraResponse = await request.get(cameraUrl)
+        console.log(`📡 ${position}区域(cameraIndex=${cameraIndex})摄像头接口响应:`, cameraResponse.data)
+        logManager.addLog('info', `摄像头接口响应成功`, { 
+            deviceId: deviceName.value || '001', 
+            monitorArea: position === 'left' ? '左侧区域' : '右侧区域',
+            module: '视频监控',
+            cameraIndex,
+            response: cameraResponse.data
+        })
 
-            videoStreams.value[position].hlsUrl = fullHlsUrl
+        if (!cameraResponse.data?.rtspUrl) {
+            console.error(`❌ ${position}区域摄像头接口未返回RTSP URL:`, cameraResponse.data)
+            throw new Error('未获取到RTSP URL')
+        }
+
+        const rtspUrl = cameraResponse.data.rtspUrl
+        console.log('📹 获取到RTSP URL:', rtspUrl)
+
+        // 调用推流接口获取流媒体URL
+        const streamApiUrl = buildUrl(API_CONFIG.ENDPOINTS.VIDEO_start)
+        console.log('🚀 调用推流接口:', streamApiUrl)
+        
+        const streamResponse = await request.post(streamApiUrl, {
+            cameraId: cameraIndex.toString(),
+            rtspUrl: rtspUrl
+        })
+        
+        console.log(`🎯 ${position}区域(cameraIndex=${cameraIndex})推流请求参数:`, {
+            cameraId: cameraIndex.toString(),
+            rtspUrl: rtspUrl
+        })
+        console.log(`🚀 ${position}区域(cameraIndex=${cameraIndex})推流接口响应:`, streamResponse.data)
+
+        if (!streamResponse.data?.flvUrl) {
+            console.error(`❌ ${position}区域推流接口未返回FLV URL:`, streamResponse.data)
+            throw new Error('未获取到推流地址')
+        }
+
+        // const streamUrl = streamResponse.data.flvUrl
+        // 根据摄像头位置配置不同的流媒体地址
+        const streamUrl = position === 'left' 
+            ? "http://192.168.1.200:8081/live.flv"  // 左侧区域摄像头
+            : "http://192.168.1.200:8080/live.flv"  // 右侧区域摄像头
+        console.log(`🎬 ${position}区域(cameraIndex=${cameraIndex})获取到流媒体地址:`, streamUrl)
+        logManager.addLog('info', `获取到流媒体地址: ${streamUrl}`, { 
+            deviceId: deviceName.value || '001', 
+            monitorArea: position === 'left' ? '左侧区域' : '右侧区域',
+            module: '视频监控',
+            cameraIndex,
+            streamUrl
+        })
+        
+        // 检查stream参数是否正确
+        // if (streamUrl && streamUrl.includes('stream=')) {
+        //     const streamParam = streamUrl.match(/stream=(\d+)/)
+        //     console.log(`🔍 ${position}区域stream参数检查:`, streamParam ? streamParam[1] : '未找到stream参数')
+        // }
+
+        if (streamUrl) {
+            // 根据URL格式动态选择播放器类型
+            const optimalPlayerType = getOptimalPlayerType(streamUrl)
+            videoStreams.value[position].playerType = optimalPlayerType
+            console.log('🎯 选择播放器类型:', optimalPlayerType)
+
             videoStreams.value[position].active = true
+            videoStreams.value[position].streamUrl = streamUrl
 
             await nextTick()
             await new Promise(resolve => setTimeout(resolve, 100))
 
             if (!isUnmounted.value) {
-                await initHlsPlayer(position, fullHlsUrl)
+                // 使用选定的播放器播放流媒体
+                await initPlayer(position, streamUrl)
             }
-        } else {
-            videoStreams.value[position].error = '获取视频流失败'
         }
     } catch (error) {
+        console.error(`❌ ${position}区域视频流启动失败:`, error)
+        
+        let errorMessage = error.message || '连接异常'
+        
+        // 根据错误类型提供更具体的错误信息
+        if (error.message && error.message.includes('status code 500')) {
+            errorMessage = '流媒体服务器内部错误(500) - 请检查流媒体服务器状态'
+        } else if (error.message && error.message.includes('ECONNRESET')) {
+            errorMessage = '后端API服务器连接失败 - 请检查服务器是否运行'
+        } else if (error.message && error.message.includes('timeout')) {
+            errorMessage = '连接超时 - 请检查网络连接'
+        } else if (error.message && error.message.includes('未获取到')) {
+            errorMessage = '后端API返回数据异常 - ' + error.message
+        }
+        
+        logManager.addLog('error', `${position}区域视频流启动失败: ${errorMessage}`, { 
+            deviceId: deviceName.value || '001', 
+            monitorArea: position === 'left' ? '左侧区域' : '右侧区域',
+            module: '视频监控',
+            cameraIndex: position === 'left' ? 0 : 1,
+            error: error.message,
+            errorType: error.name || 'Unknown'
+        })
+        
         if (videoStreams.value?.[position]) {
-            videoStreams.value[position].error = '连接异常'
+            videoStreams.value[position].error = errorMessage
+            videoStreams.value[position].active = false
         }
     } finally {
         if (videoStreams.value?.[position]) {
@@ -814,76 +970,402 @@ const startVideoStream = async (position) => {
     }
 }
 
-// 初始化HLS播放器
-const initHlsPlayer = async (position, hlsUrl) => {
-    try {
-        if (isUnmounted.value) return
 
-        const videoElement = document.querySelector(`#monitor-${position} video`)
-        if (!videoElement) {
-            if (videoStreams.value?.[position]) {
-                videoStreams.value[position].error = 'DOM元素未找到'
-            }
+
+// HTML5播放器健康检查
+const startHtml5HealthCheck = (position, videoElement) => {
+    const healthCheckInterval = setInterval(() => {
+        if (isUnmounted.value || !videoElement) {
+            clearInterval(healthCheckInterval)
             return
         }
 
-        // 销毁现有的HLS实例
-        if (videoStreams.value[position]?.hlsInstance) {
-            videoStreams.value[position].hlsInstance.destroy()
-            videoStreams.value[position].hlsInstance = null
+        // 检查video元素是否还在DOM中
+        if (!document.contains(videoElement)) {
+            clearInterval(healthCheckInterval)
+            return
         }
 
-        if (Hls.isSupported()) {
-            const hls = new Hls({
-                debug: false,
-                enableWorker: true,
-                lowLatencyMode: true,
-                backBufferLength: 90
-            })
+        // 检查播放状态
+        try {
+            const isPlaying = !videoElement.paused && !videoElement.ended && videoElement.readyState > 2
 
-            hls.loadSource(hlsUrl)
-            hls.attachMedia(videoElement)
+            // 如果视频停止播放，尝试重新播放
+            if (!isPlaying && !videoElement.paused && videoElement.readyState > 0) {
+                videoElement.play().catch(e => {
+                    // 静默处理播放失败
+                })
+            }
+        } catch (e) {
+            // 静默处理状态检查失败
+        }
+    }, 10000) // 每10秒检查一次，减少CPU占用
 
-            hls.on(Hls.Events.MANIFEST_PARSED, () => {
-                videoElement.play().catch(() => { })
-            })
+    // 存储定时器ID以便清理
+    if (!videoStreams.value[position].healthCheckInterval) {
 
-            hls.on(Hls.Events.ERROR, (event, data) => {
-                if (data?.fatal) {
-                    switch (data.type) {
-                        case Hls.ErrorTypes.NETWORK_ERROR:
-                            hls.startLoad()
-                            break
-                        case Hls.ErrorTypes.MEDIA_ERROR:
-                            hls.recoverMediaError()
-                            break
-                        default:
-                            hls.destroy()
-                            if (videoStreams.value?.[position]) {
-                                videoStreams.value[position].error = '播放器错误'
-                            }
-                            break
-                    }
-                }
-            })
 
-            videoStreams.value[position].hlsInstance = hls
-        } else if (videoElement.canPlayType('application/vnd.apple.mpegurl')) {
-            videoElement.src = hlsUrl
-            videoElement.addEventListener('loadedmetadata', () => {
-                videoElement.play().catch(() => { })
-            })
+
+        videoStreams.value[position].healthCheckInterval = healthCheckInterval
+    }
+}
+
+
+
+// 统一播放器初始化函数
+const initPlayer = async (position, streamUrl) => {
+    const playerType = videoStreams.value[position]?.playerType || optimalPlayerType
+
+    try {
+        if (playerType === PLAYER_TYPES.HTML5) {
+            await initHtml5Player(position, streamUrl)
+        } else if (playerType === PLAYER_TYPES.FLV_JS) {
+            await initFlvJsPlayer(position, streamUrl)
         } else {
             if (videoStreams.value?.[position]) {
-                videoStreams.value[position].error = '浏览器不支持HLS播放'
+                videoStreams.value[position].error = `不支持的播放器类型: ${playerType}`
             }
         }
     } catch (error) {
         if (videoStreams.value?.[position]) {
-            videoStreams.value[position].error = '播放器初始化失败'
+            videoStreams.value[position].error = `播放器初始化失败: ${error.message}`
         }
     }
 }
+
+
+
+// 初始化HTML5播放器
+const initHtml5Player = async (position, streamUrl) => {
+    try {
+        if (isUnmounted.value) {
+            return
+        }
+
+        // 查找视频容器元素
+        const containerElement = document.querySelector(`#monitor-${position}`)
+        if (!containerElement) {
+            if (videoStreams.value?.[position]) {
+                videoStreams.value[position].error = '容器元素未找到'
+            }
+            return
+        }
+
+        // 清理现有video实例
+        if (videoStreams.value[position]?.videoElement) {
+            videoStreams.value[position].videoElement.remove()
+            videoStreams.value[position].videoElement = null
+        }
+
+        // 清空容器内容
+        containerElement.innerHTML = ''
+
+        // 创建video元素
+        const videoElement = document.createElement('video')
+        videoElement.width = 488
+        videoElement.height = 279
+        videoElement.autoplay = true
+        videoElement.muted = true
+        videoElement.controls = false
+        videoElement.playsInline = true
+        videoElement.style.objectFit = 'cover'
+        videoElement.style.width = '100%'
+        videoElement.style.height = '100%'
+
+        // 设置视频源
+        videoElement.src = streamUrl
+        console.log('🎬 HTML5播放器设置视频源:', streamUrl)
+
+        // 添加事件监听器
+        videoElement.addEventListener('loadstart', () => {
+            console.log('📺 HTML5播放器开始加载视频')
+        })
+
+        videoElement.addEventListener('canplay', () => {
+            console.log('✅ HTML5播放器可以播放')
+            videoStreams.value[position].isPlayingVideo = true
+        })
+
+        videoElement.addEventListener('playing', () => {
+            console.log('▶️ HTML5播放器正在播放')
+            videoStreams.value[position].isPlayingVideo = true
+        })
+
+        videoElement.addEventListener('pause', () => {
+            console.log('⏸️ HTML5播放器暂停')
+            videoStreams.value[position].isPlayingVideo = false
+        })
+
+        videoElement.addEventListener('error', (error) => {
+            console.error('❌ HTML5播放器错误:', error)
+            if (videoStreams.value?.[position]) {
+                videoStreams.value[position].error = 'HTML5播放器错误: ' + (error.message || '未知错误')
+                videoStreams.value[position].isPlayingVideo = false
+            }
+        })
+
+        videoElement.addEventListener('loadeddata', () => {
+            console.log('📊 HTML5播放器数据加载完成')
+        })
+
+        videoElement.addEventListener('loadedmetadata', () => {
+            console.log('📋 HTML5播放器元数据加载完成')
+        })
+
+        videoElement.addEventListener('stalled', () => {
+            // 静默处理加载停滞
+        })
+
+        videoElement.addEventListener('waiting', () => {
+            // 静默处理缓冲
+        })
+
+        // 添加到容器
+        containerElement.appendChild(videoElement)
+
+        // 保存video元素引用
+        videoStreams.value[position].videoElement = videoElement
+
+        // 尝试播放
+        try {
+            await videoElement.play()
+        } catch (playError) {
+            // 自动播放失败是常见的，不算错误
+        }
+
+        // 启动视频流健康检查
+        startHtml5HealthCheck(position, videoElement)
+
+    } catch (error) {
+        if (videoStreams.value?.[position]) {
+            videoStreams.value[position].error = 'HTML5播放器初始化失败: ' + error.message
+        }
+    }
+}
+
+
+// 初始化FLV.js播放器
+const initFlvJsPlayer = async (position, streamUrl) => {
+    try {
+        if (isUnmounted.value) {
+            return
+        }
+
+        // 检查flv.js支持
+        if (!flvjs.isSupported()) {
+            if (videoStreams.value?.[position]) {
+                videoStreams.value[position].error = '浏览器不支持FLV播放'
+            }
+            return
+        }
+
+        // 查找视频容器元素
+        const containerElement = document.querySelector(`#monitor-${position}`)
+        if (!containerElement) {
+            if (videoStreams.value?.[position]) {
+                videoStreams.value[position].error = '容器元素未找到'
+            }
+            return
+        }
+
+        // 清理现有播放器实例
+        if (videoStreams.value[position]?.flvPlayer) {
+            videoStreams.value[position].flvPlayer.destroy()
+            videoStreams.value[position].flvPlayer = null
+        }
+
+        if (videoStreams.value[position]?.videoElement) {
+            videoStreams.value[position].videoElement.remove()
+            videoStreams.value[position].videoElement = null
+        }
+
+        // 清空容器内容
+        containerElement.innerHTML = ''
+
+        // 创建video元素
+        const videoElement = document.createElement('video')
+        videoElement.style.width = '484px'
+        videoElement.style.height = '275px'
+        videoElement.style.objectFit = 'cover'
+        videoElement.controls = false
+        videoElement.autoplay = true
+        videoElement.muted = true // 自动播放需要静音
+        videoElement.playsInline = true
+
+        // FLV.js配置参数
+        const flvPlayerConfig = {
+            enableWorker: false,        // 禁用Web Worker（Electron兼容性）
+            enableStashBuffer: false,   // 禁用缓存（降低延迟）
+            isLive: true,              // 直播流模式
+            lazyLoad: true,
+            lazyLoadMaxDuration: 3 * 60,
+            autoCleanupSourceBuffer: true,
+            autoCleanupMaxBackwardDuration: 3 * 60,
+            autoCleanupMinBackwardDuration: 2 * 60,
+            fixAudioTimestampGap: true,
+            accurateSeek: false,
+            // 网络相关配置
+            headers: {},               // 清空自定义头部
+            reuseRedirectedURL: true,  // 重用重定向URL
+            referrerPolicy: 'no-referrer' // 设置referrer策略
+        }
+
+        // 移除网络连接预检查，避免干扰FLV播放器连接
+        logManager.addLog('info', `开始配置FLV播放器: ${streamUrl}`, { 
+            deviceId: deviceName.value || '001', 
+            monitorArea: position === 'left' ? '左侧区域' : '右侧区域',
+            module: '视频监控',
+            streamUrl,
+            action: '配置FLV播放器'
+        })
+
+        // 创建FLV播放器实例
+        console.log('🎥 配置HTTP-FLV流播放器:', streamUrl)
+        let playerMediaDataSource = {
+            type: 'flv',
+            url: streamUrl,
+            isLive: true,
+            cors: false,  // 禁用CORS，避免跨域问题
+            withCredentials: false,
+            hasAudio: false,  // 如果流没有音频，可以提高兼容性
+            hasVideo: true
+        }
+
+        console.log('🎬 创建FLV播放器，配置:', { playerMediaDataSource, flvPlayerConfig })
+        const flvPlayer = flvjs.createPlayer(playerMediaDataSource, flvPlayerConfig)
+
+        // 绑定事件监听器
+        videoElement.addEventListener('loadstart', () => {
+            // 静默处理加载开始
+        })
+
+        videoElement.addEventListener('canplay', () => {
+            if (videoStreams.value?.[position]) {
+                videoStreams.value[position].loading = false
+                videoStreams.value[position].active = true
+            }
+        })
+
+        videoElement.addEventListener('play', () => {
+            // 静默处理播放开始
+        })
+
+        videoElement.addEventListener('pause', () => {
+            // 静默处理暂停
+        })
+
+        videoElement.addEventListener('error', (error) => {
+            if (videoStreams.value?.[position]) {
+                videoStreams.value[position].error = 'FLV播放器错误: ' + (error.message || '未知错误')
+            }
+        })
+
+        videoElement.addEventListener('stalled', () => {
+            // 静默处理加载停滞
+        })
+
+        videoElement.addEventListener('waiting', () => {
+            // 静默处理缓冲
+        })
+
+        // FLV播放器事件监听
+        flvPlayer.on(flvjs.Events.ERROR, (errorType, errorDetail, errorInfo) => {
+            console.error('FLV播放器错误:', {
+                errorType,
+                errorDetail,
+                errorInfo,
+                streamUrl
+            })
+            if (videoStreams.value?.[position]) {
+                let errorMessage = `FLV播放错误: ${errorDetail}`
+                
+                // 根据错误类型提供更具体的错误信息
+                if (errorDetail && errorDetail.includes('NetworkError')) {
+                    errorMessage += ' - 网络连接失败，请检查流媒体服务器状态'
+                } else if (errorDetail && errorDetail.includes('CORS')) {
+                    errorMessage += ' - 跨域访问被阻止，请检查服务器CORS配置'
+                } else if (errorDetail && errorDetail.includes('404')) {
+                    errorMessage += ' - 流地址不存在或已失效'
+                } else if (errorDetail && errorDetail.includes('timeout')) {
+                    errorMessage += ' - 连接超时，请检查网络连接'
+                }
+                
+                videoStreams.value[position].error = errorMessage
+            }
+        })
+
+        flvPlayer.on(flvjs.Events.LOADING_COMPLETE, () => {
+            // 静默处理加载完成
+        })
+
+        flvPlayer.on(flvjs.Events.RECOVERED_EARLY_EOF, () => {
+            // 静默处理EOF恢复
+        })
+
+        // 将video元素添加到容器
+        containerElement.appendChild(videoElement)
+
+        // 绑定媒体元素
+        flvPlayer.attachMediaElement(videoElement)
+
+        // 加载并播放
+        await flvPlayer.load()
+
+        try {
+            await videoElement.play()
+        } catch (playError) {
+            // 自动播放失败不算致命错误，用户可以手动点击播放
+        }
+
+        // 保存播放器实例引用
+        videoStreams.value[position].flvPlayer = flvPlayer
+        videoStreams.value[position].videoElement = videoElement
+
+        // 启动FLV播放器健康检查
+        startFlvJsHealthCheck(position, flvPlayer, videoElement)
+
+    } catch (error) {
+        if (videoStreams.value?.[position]) {
+            videoStreams.value[position].error = 'FLV播放器初始化失败: ' + error.message
+        }
+    }
+}
+
+// FLV.js播放器健康检查
+const startFlvJsHealthCheck = (position, flvPlayer, videoElement) => {
+    const healthCheckInterval = setInterval(() => {
+        try {
+            if (isUnmounted.value) {
+                clearInterval(healthCheckInterval)
+                return
+            }
+
+            if (!videoElement || !videoElement.parentNode) {
+                clearInterval(healthCheckInterval)
+                return
+            }
+
+            const isPlaying = !videoElement.paused && !videoElement.ended && videoElement.readyState > 2
+
+            // 如果视频停止播放，尝试恢复
+            if (!isPlaying && !videoElement.paused) {
+                videoElement.play().catch(e => {
+                    // 静默处理播放失败
+                })
+            }
+
+        } catch (e) {
+            // 静默处理状态检查失败
+        }
+    }, 30000) // 每30秒检查一次，减少CPU占用
+
+    // 保存健康检查定时器引用
+    if (videoStreams.value?.[position]) {
+        videoStreams.value[position].flvHealthCheckInterval = healthCheckInterval
+    }
+}
+
+
 
 // 停止视频流
 const stopVideoStream = async (position) => {
@@ -896,25 +1378,83 @@ const stopVideoStream = async (position) => {
             return
         }
 
-        // 销毁HLS实例
-        if (videoStreams.value[position].hlsInstance) {
-            videoStreams.value[position].hlsInstance.destroy()
-            videoStreams.value[position].hlsInstance = null
+        // 清理健康检查定时器
+        if (videoStreams.value[position].healthCheckInterval) {
+            clearInterval(videoStreams.value[position].healthCheckInterval)
+            videoStreams.value[position].healthCheckInterval = null
         }
 
-        // 视频流已通过HLS实例销毁
+
+
+        // 根据播放器类型进行清理
+        const playerType = videoStreams.value[position].playerType || optimalPlayerType
+
+        if (playerType === PLAYER_TYPES.HTML5 && videoStreams.value[position].videoElement) {
+            // 清理HTML5播放器
+            try {
+                videoStreams.value[position].videoElement.pause()
+                videoStreams.value[position].videoElement.src = ''
+                videoStreams.value[position].videoElement.load()
+                videoStreams.value[position].videoElement.remove()
+            } catch (cleanupError) {
+                console.warn(`⚠️ [stopVideoStream] ${position}区域HTML5播放器清理时出现警告:`, cleanupError)
+            }
+            videoStreams.value[position].videoElement = null
+            // HTML5播放器已清理
+        } else if (playerType === PLAYER_TYPES.FLV_JS) {
+            // 清理FLV.js播放器
+            try {
+                // 清理FLV健康检查定时器
+                if (videoStreams.value[position].flvHealthCheckInterval) {
+                    clearInterval(videoStreams.value[position].flvHealthCheckInterval)
+                    videoStreams.value[position].flvHealthCheckInterval = null
+                }
+
+                // 清理FLV播放器实例
+                if (videoStreams.value[position].flvPlayer) {
+                    videoStreams.value[position].flvPlayer.destroy()
+                    videoStreams.value[position].flvPlayer = null
+                }
+
+                // 清理video元素
+                if (videoStreams.value[position].videoElement) {
+                    videoStreams.value[position].videoElement.pause()
+                    videoStreams.value[position].videoElement.src = ''
+                    videoStreams.value[position].videoElement.load()
+                    videoStreams.value[position].videoElement.remove()
+                    videoStreams.value[position].videoElement = null
+                }
+
+                // 清理容器
+                const containerElement = document.querySelector(`#monitor-${position}`)
+                if (containerElement) {
+                    containerElement.innerHTML = ''
+                }
+
+                // FLV.js播放器已清理
+            } catch (cleanupError) {
+                console.warn(`⚠️ [stopVideoStream] ${position}区域FLV.js播放器清理时出现警告:`, cleanupError)
+            }
+        }
+
+        // 重置视频流状态
         videoStreams.value[position].active = false
-        videoStreams.value[position].hlsUrl = null
+        videoStreams.value[position].streamUrl = null
         videoStreams.value[position].error = null
-        console.log(`${position}视频流已停止`)
+        // 视频流已停止
     } catch (error) {
         console.error(`停止${position}视频流失败:`, error)
     }
 }
 
+
+
+
+
 // 处理视频错误
 const handleVideoError = (position, event) => {
     console.error(`${position}视频播放错误:`, event)
+    // 视频播放错误
     if (!isUnmounted.value && videoStreams.value && videoStreams.value[position]) {
         videoStreams.value[position].error = '视频播放失败'
         videoStreams.value[position].active = false
@@ -923,16 +1463,18 @@ const handleVideoError = (position, event) => {
 
 // 启动所有视频流
 const startAllVideoStreams = async () => {
-    console.log('开始启动所有视频流...')
+    console.log('🚀 开始启动所有视频流')
+    // 开始启动所有视频流
     await Promise.all([
         startVideoStream('left'),
         startVideoStream('right')
     ])
+    console.log('✅ 所有视频流启动完成')
 }
 
 // 停止所有视频流
 const stopAllVideoStreams = async () => {
-    console.log('停止所有视频流...')
+    // 停止所有视频流
     await Promise.all([
         stopVideoStream('left'),
         stopVideoStream('right')
@@ -967,6 +1509,13 @@ const deviceStore = useDeviceStore()
 const todetail = () => {
     router.push({ name: 'LiShi' })
 }
+
+// 跳转到日志页面
+const goToLogPage = () => {
+    router.push({ name: 'Log' })
+}
+
+// 日志查看功能已移除
 // 当前时间
 const currentTime = ref('')
 
@@ -1105,7 +1654,7 @@ const saveThresholds = async () => {
             name: settingsForm.value.name || ''
         }
         await request.put(API_CONFIG.ENDPOINTS.THRESHOLDS, thresholdsData)
-        console.log('设备参数保存成功')
+        // 设备参数保存成功
     } catch (error) {
         console.error('保存设备参数失败:', error)
     }
@@ -1121,7 +1670,7 @@ const saveStationNumber = async () => {
         // 将Map转换为对象格式发送
         const stationObj = Object.fromEntries(stationData)
         await request.post(API_CONFIG.ENDPOINTS.STATION, stationObj)
-        console.log('设备号保存成功')
+        // 设备号保存成功
     } catch (error) {
         console.error('保存设备号失败:', error)
     }
@@ -1137,7 +1686,7 @@ const saveCustomDeviceInfo = async () => {
             icon: fullImagePath.value || ''
         }
         await request.post(API_CONFIG.ENDPOINTS.CUSTOM_DEVICE_SAVE, customDeviceData)
-        console.log('自定义设备信息保存成功')
+        // 自定义设备信息保存成功
     } catch (error) {
         console.error('保存自定义设备信息失败:', error)
     }
@@ -1186,7 +1735,7 @@ const playFallbackBeep = (frequency) => {
         oscillator.start()
         oscillator.stop(audioContext.currentTime + 0.1)
 
-        console.log(`备用蜂鸣器播放: ${frequency}Hz`)
+        // 备用蜂鸣器播放
     } catch (error) {
         console.error('备用蜂鸣器也失败:', error)
         // 最后的备用方案：系统提示音
@@ -1212,7 +1761,7 @@ const createBeepSound = async () => {
         // 检查音频上下文状态，如果是suspended需要恢复
         if (alarmState.value.audioContext.state === 'suspended') {
             await alarmState.value.audioContext.resume()
-            console.log('音频上下文已恢复')
+            // 音频上下文已恢复
         }
 
         // 创建振荡器（产生声音）
@@ -1233,7 +1782,7 @@ const createBeepSound = async () => {
         // 开始播放
         alarmState.value.oscillator.start()
 
-        console.log('蜂鸣器报警已启动')
+        // 蜂鸣器报警已启动
     } catch (error) {
         console.error('创建蜂鸣器声音失败:', error)
         playFallbackBeep(1000)
@@ -1256,7 +1805,7 @@ const createWarningBeepSound = async () => {
         // 检查音频上下文状态，如果是suspended需要恢复
         if (alarmState.value.warningAudioContext.state === 'suspended') {
             await alarmState.value.warningAudioContext.resume()
-            console.log('预警音频上下文已恢复')
+            // 预警音频上下文已恢复
         }
 
         // 创建振荡器（产生声音）
@@ -1277,7 +1826,7 @@ const createWarningBeepSound = async () => {
         // 开始播放
         alarmState.value.warningOscillator.start()
 
-        console.log('预警蜂鸣器已启动')
+        // 预警蜂鸣器已启动
     } catch (error) {
         console.error('创建预警蜂鸣器声音失败:', error)
         playFallbackBeep(800)
@@ -1300,7 +1849,7 @@ const stopBeepSound = () => {
             alarmState.value.audioContext.close()
             alarmState.value.audioContext = null
         }
-        console.log('蜂鸣器报警已停止')
+        // 蜂鸣器报警已停止
     } catch (error) {
         console.error('停止蜂鸣器声音失败:', error)
     }
@@ -1322,7 +1871,7 @@ const stopWarningBeepSound = () => {
             alarmState.value.warningAudioContext.close()
             alarmState.value.warningAudioContext = null
         }
-        console.log('预警蜂鸣器已停止')
+        // 预警蜂鸣器已停止
     } catch (error) {
         console.error('停止预警蜂鸣器声音失败:', error)
     }
@@ -1332,7 +1881,7 @@ const stopWarningBeepSound = () => {
 const startAlarm = async () => {
     if (alarmState.value.isAlarming) return
 
-    console.log('启动报警模式')
+    // 启动报警模式
     alarmState.value.isAlarming = true
 
     // 启动蜂鸣器
@@ -1363,7 +1912,7 @@ const startAlarm = async () => {
 const startWarning = async () => {
     if (alarmState.value.isWarning) return
 
-    console.log('启动预警模式')
+    // 启动预警模式
     alarmState.value.isWarning = true
 
     // 启动预警蜂鸣器
@@ -1394,7 +1943,7 @@ const startWarning = async () => {
 const stopAlarm = () => {
     if (!alarmState.value.isAlarming) return
 
-    console.log('停止报警模式')
+    // 停止报警模式
     alarmState.value.isAlarming = false
 
     // 停止蜂鸣器
@@ -1427,7 +1976,7 @@ const stopAlarm = () => {
 const stopWarning = () => {
     if (!alarmState.value.isWarning) return
 
-    console.log('停止预警模式')
+    // 停止预警模式
     alarmState.value.isWarning = false
 
     // 停止预警蜂鸣器
@@ -1464,7 +2013,7 @@ const checkAlarmStatus = () => {
         return
     }
 
-    console.log('检查报警状态...')
+    // 检查报警状态
 
     // 检查deviceStore是否有效
     if (!deviceStore) {
@@ -1472,8 +2021,8 @@ const checkAlarmStatus = () => {
         return
     }
 
-    console.log('设备数据:', deviceStore.devices)
-    console.log('告警数据:', deviceStore.alarms)
+    // 静默处理设备数据
+    // 静默处理告警数据
 
     try {
         // 只检查device数组中的状态
@@ -1483,14 +2032,14 @@ const checkAlarmStatus = () => {
         const hasDeviceWarning = Array.isArray(deviceStore.devices) ?
             deviceStore.devices.some(device => device?.currentStatus === 'WARNING' || device?.currentStatus === 'IN_USE') : false
 
-        console.log('设备ALARM状态:', hasDeviceAlarm)
-        console.log('设备WARNING状态:', hasDeviceWarning)
-        console.log('当前是否正在报警:', alarmState.value?.isAlarming)
-        console.log('当前是否正在预警:', alarmState.value?.isWarning)
+        // 静默处理设备ALARM状态
+        // 静默处理设备WARNING状态
+        // 静默处理当前是否正在报警
+        // 静默处理当前是否正在预警
 
         // 处理ALARM状态（优先级最高）
         if (hasDeviceAlarm && !alarmState.value?.isAlarming) {
-            console.log('触发设备报警！')
+            // 触发设备报警
             // 如果正在预警，先停止预警
             if (alarmState.value?.isWarning) {
                 stopWarning()
@@ -1499,19 +2048,19 @@ const checkAlarmStatus = () => {
                 console.error('启动报警失败:', error)
             })
         } else if (!hasDeviceAlarm && alarmState.value?.isAlarming) {
-            console.log('停止设备报警！')
+            // 停止设备报警
             stopAlarm()
         }
 
         // 处理WARNING状态（只有在没有ALARM时才处理）
         if (!hasDeviceAlarm) {
             if (hasDeviceWarning && !alarmState.value?.isWarning) {
-                console.log('触发设备预警！')
+                // 触发设备预警
                 startWarning().catch(error => {
                     console.error('启动预警失败:', error)
                 })
             } else if (!hasDeviceWarning && alarmState.value?.isWarning) {
-                console.log('停止设备预警！')
+                // 停止设备预警
                 stopWarning()
             }
         }
@@ -1719,8 +2268,8 @@ const updateDeviceGroups = () => {
             if (device.icon) {
                 // 如果API返回了icon字段，优先使用
                 if (process.env.NODE_ENV === 'development') {
-                    // 开发环境：使用192.168.1.200:8061拼接完整路径
-                deviceIcon = device.icon.startsWith('http') ? device.icon : `http://192.168.1.200:8061${device.icon}`
+                    // 开发环境：使用127.0.0.1:8061拼接完整路径
+                    deviceIcon = device.icon.startsWith('http') ? device.icon : `http://127.0.0.1:8061${device.icon}`
                 } else {
                     // 生产环境：使用127.0.0.1“8061拼接完整路径
                     const apiBaseUrl = process.env.VITE_API_BASE_URL || 'http://127.0.0.1:8061'
@@ -1766,8 +2315,8 @@ const updateDeviceGroups = () => {
 const checkDeviceStatusForVideo = (devices) => {
     if (isUnmounted.value || !devices || !Array.isArray(devices)) return
 
-    console.log('🔍 检查设备状态，更新视频播放')
-    console.log('📊 设备数据:', devices.map(d => ({ name: d.name, status: d.currentStatus })))
+    // 检查设备状态，更新视频播放
+    // 静默处理设备数据
 
     // 更新左侧区域（灭火器专用）
     updateLeftAreaVideo(devices)
@@ -1995,15 +2544,15 @@ const beforeUpload = (file) => {
 
 // 上传成功回调
 const handleUploadSuccess = (response, file) => {
-    console.log('上传成功:', response)
+    // 上传成功
     if (response && response.path) {
         // 保存原始路径
         settingsForm.value.uploadedImage = response.path
         // 根据环境处理图片显示路径
         if (process.env.NODE_ENV === 'development') {
-            // 开发环境：使用192.168.1.200:8061拼接完整的服务器地址
-                        settingsForm.value.uploadedImageUrl = response.path.startsWith('http') ?
-                        response.path : `http://192.168.1.200:8061${response.path}`
+            // 开发环境：使用127.0.0.1:8061拼接完整的服务器地址
+            settingsForm.value.uploadedImageUrl = response.path.startsWith('http') ?
+                response.path : `http://127.0.0.1:8061${response.path}`
         } else {
             // 生产环境：使用127.0.0.1“8061拼接完整的服务器地址
             const apiBaseUrl = process.env.VITE_API_BASE_URL || 'http://127.0.0.1:8061'
@@ -2036,7 +2585,7 @@ const closeDialog = () => {
 
 // 确认登录
 const handleConfirm = async () => {
-    console.log('登录信息:', loginForm.value)
+    // 静默处理登录信息
 
     // 验证账号密码
     const isValid = await verifyPassword(loginForm.value.username, loginForm.value.password)
@@ -2084,7 +2633,7 @@ const captureLeft = async () => {
             if (window.electronAPI && window.electronAPI.saveScreenshot) {
                 const result = await window.electronAPI.saveScreenshot(dataURL, defaultName)
                 if (result.success) {
-                    console.log('截图保存成功:', result.filePath)
+                    // 截图保存成功
                 } else {
                     console.error('截图保存失败:', result.message)
                 }
@@ -2122,7 +2671,7 @@ const captureRight = async () => {
             if (window.electronAPI && window.electronAPI.saveScreenshot) {
                 const result = await window.electronAPI.saveScreenshot(dataURL, defaultName)
                 if (result.success) {
-                    console.log('截图保存成功:', result.filePath)
+                    // 截图保存成功
                 } else {
                     console.error('截图保存失败:', result.message)
                 }
@@ -2153,7 +2702,7 @@ onMounted(async () => {
 
     // 监听设备数据变化，更新界面
     storeUnsubscribe = deviceStore.$subscribe(() => {
-        console.log('🔄 设备数据更新:', deviceStore.devices)
+        // 设备数据更新
         updateDeviceGroups() // updateDeviceGroups内部已经调用了checkDeviceStatusForVideo
         // 检查报警状态
         checkAlarmStatus()
@@ -2162,14 +2711,18 @@ onMounted(async () => {
     // 初始化数据
     updateDeviceGroups()
 
-    // 获取设备参数数据，包括设备名称
-    await Promise.all([fetchThresholds(), fetchStationNumber()])
+    // 获取设备参数数据，包括设备名称（不阻止后续流程）
+    try {
+        await Promise.all([fetchThresholds(), fetchStationNumber()])
+    } catch (error) {
+        console.warn('获取设备参数失败，但不影响视频流启动:', error)
+    }
 
     // 初始检查报警状态
     checkAlarmStatus()
 
 
-    console.log('🚀 开始初始化设备监控系统...')
+    // 开始初始化设备监控系统
 
     // 重置视频播放计数
     videoPlayCount.value = 0
@@ -2179,14 +2732,19 @@ onMounted(async () => {
     // 添加更长的延迟确保DOM元素完全准备好和稳定
     startupTimer = setTimeout(async () => {
         if (isUnmounted.value) {
-            console.log('组件已卸载，跳过视频流启动')
+            // 组件已卸载，跳过视频流启动
             return
         }
         try {
-            console.log('开始启动视频流，DOM应该已经完全准备好')
+            // 开始启动视频流，DOM应该已经完全准备好
+            console.log('📊 当前视频流状态:', JSON.stringify({
+                left: { loading: videoStreams.value?.left?.loading, active: videoStreams.value?.left?.active, error: videoStreams.value?.left?.error },
+                right: { loading: videoStreams.value?.right?.loading, active: videoStreams.value?.right?.active, error: videoStreams.value?.right?.error }
+            }, null, 2))
             await startAllVideoStreams()
+            // 视频流启动完成
         } catch (error) {
-            console.error('启动视频流失败:', error)
+            console.error('❌ 启动视频流失败:', error)
         }
     }, 500)
 })
@@ -2216,33 +2774,20 @@ onUnmounted(async () => {
     // 停止设备状态轮询
     deviceStore.stopPolling()
 
-    // 安全地清理HLS实例和视频元素
+    // 安全地清理健康检查定时器
     try {
-        if (videoStreams.value && videoStreams.value.left && videoStreams.value.left.hlsInstance) {
-            videoStreams.value.left.hlsInstance.destroy()
-            videoStreams.value.left.hlsInstance = null
-        }
-        if (videoStreams.value && videoStreams.value.right && videoStreams.value.right.hlsInstance) {
-            videoStreams.value.right.hlsInstance.destroy()
-            videoStreams.value.right.hlsInstance = null
-        }
-
-        // 清理视频元素
-        ['left', 'right'].forEach(position => {
-            try {
-                const containerElement = document.querySelector(`#monitor-${position}`)
-                if (containerElement) {
-                    const videoElement = containerElement.querySelector('video')
-                    if (videoElement) {
-                        videoElement.pause()
-                        videoElement.src = ''
-                        videoElement.load()
-                    }
-                }
-            } catch (domError) {
-                console.warn(`清理${position}视频元素时发生错误:`, domError)
+        if (videoStreams.value && videoStreams.value.left) {
+            if (videoStreams.value.left.healthCheckInterval) {
+                clearInterval(videoStreams.value.left.healthCheckInterval)
+                videoStreams.value.left.healthCheckInterval = null
             }
-        })
+        }
+        if (videoStreams.value && videoStreams.value.right) {
+            if (videoStreams.value.right.healthCheckInterval) {
+                clearInterval(videoStreams.value.right.healthCheckInterval)
+                videoStreams.value.right.healthCheckInterval = null
+            }
+        }
 
         // 停止所有视频流
         await stopAllVideoStreams()
@@ -2710,6 +3255,21 @@ onUnmounted(async () => {
             font-weight: bold;
             font-family: 'Source Han Sans CN', sans-serif;
             margin-left: 36px;
+        }
+
+        .device-number-clickable {
+            cursor: pointer;
+            transition: all 0.3s ease;
+            
+            &:hover {
+                color: #32A4F1;
+                text-shadow: 0 0 5px rgba(50, 164, 241, 0.5);
+                transform: scale(1.05);
+            }
+            
+            &:active {
+                transform: scale(0.98);
+            }
         }
 
         .status-subtitle {

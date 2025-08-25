@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HLS 视频播放器</title>
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: #000;
+      overflow: hidden;
+      font-family: Arial, sans-serif;
+    }
+    .container {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
+    #videoPlayer {
+      flex-grow: 1;
+      width: 100%;
+      background-color: #000;
+    }
+    .controls {
+      background-color: #333;
+      padding: 10px;
+      display: flex;
+      align-items: center;
+    }
+    .controls input {
+      flex-grow: 1;
+      padding: 8px;
+      border: none;
+      border-radius: 4px;
+      margin-right: 10px;
+    }
+    .controls button {
+      padding: 8px 15px;
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .controls button:hover {
+      background-color: #45a049;
+    }
+    #status {
+      position: fixed;
+      top: 10px;
+      left: 10px;
+      background-color: rgba(0, 0, 0, 0.7);
+      color: white;
+      padding: 10px;
+      border-radius: 5px;
+      z-index: 100;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <video id="videoPlayer" controls autoplay></video>
+    
+    <div class="controls">
+      <input type="text" id="streamUrl" placeholder="输入视频流地址" value="http://localhost:8061/fire-monitor/streams/camera1/playlist.m3u8">
+      <button onclick="playVideo()">播放</button>
+    </div>
+  </div>
+  
+  <div id="status"></div>
+  
+  <script>
+    // 显示状态信息
+    function showStatus(message, duration = 3000) {
+      const statusElement = document.getElementById('status');
+      statusElement.textContent = message;
+      statusElement.style.display = 'block';
+      
+      setTimeout(() => {
+        statusElement.style.display = 'none';
+      }, duration);
+    }
+    
+    // 播放视频
+    function playVideo() {
+      const video = document.getElementById('videoPlayer');
+      const url = document.getElementById('streamUrl').value.trim();
+      
+      if (!url) {
+        showStatus('请输入有效的视频地址');
+        return;
+      }
+      
+      showStatus('正在加载视频流...');
+      
+      // 如果有正在播放的视频，先停止
+      if (window.hls) {
+        window.hls.destroy();
+      }
+      
+      // 检查是否是 HLS 流 (.m3u8)
+      if (url.includes('.m3u8')) {
+        // 检查浏览器是否原生支持 HLS
+        if (video.canPlayType('application/vnd.apple.mpegurl')) {
+          video.src = url;
+          video.addEventListener('loadedmetadata', function() {
+            video.play();
+            showStatus('视频加载成功');
+          });
+        } 
+        // 使用 hls.js 播放
+        else if (Hls.isSupported()) {
+          window.hls = new Hls({
+            debug: false,
+            enableWorker: true,
+            lowLatencyMode: true,
+            backBufferLength: 90
+          });
+          
+          window.hls.loadSource(url);
+          window.hls.attachMedia(video);
+          
+          window.hls.on(Hls.Events.MANIFEST_PARSED, function() {
+            video.play().catch(e => {
+              showStatus('自动播放失败，请点击视频进行播放: ' + e.message);
+            });
+            showStatus('HLS 流加载成功');
+          });
+          
+          window.hls.on(Hls.Events.ERROR, function(event, data) {
+            if (data.fatal) {
+              switch(data.type) {
+                case Hls.ErrorTypes.NETWORK_ERROR:
+                  showStatus('网络错误，尝试恢复...');
+                  window.hls.startLoad();
+                  break;
+                case Hls.ErrorTypes.MEDIA_ERROR:
+                  showStatus('媒体错误，尝试恢复...');
+                  window.hls.recoverMediaError();
+                  break;
+                default:
+                  showStatus('无法恢复的错误: ' + data.details);
+                  window.hls.destroy();
+                  break;
+              }
+            } else {
+              showStatus('非致命错误: ' + data.details);
+            }
+          });
+        } else {
+          showStatus('您的浏览器不支持 HLS 流媒体播放');
+        }
+      } else {
+        // 普通视频
+        try {
+          video.src = url;
+          video.addEventListener('loadeddata', function() {
+            showStatus('视频加载成功');
+          });
+          
+          video.addEventListener('error', function() {
+            showStatus('无法播放此视频，请检查地址是否正确');
+          });
+          
+          video.play().catch(e => {
+            showStatus('自动播放失败，请点击视频进行播放: ' + e.message);
+          });
+        } catch (e) {
+          showStatus('播放视频时出错: ' + e.message);
+        }
+      }
+    }
+    
+    // 页面加载完成后自动播放
+    document.addEventListener('DOMContentLoaded', function() {
+      playVideo();
+    });
+    
+    // 添加键盘快捷键
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'r' || e.key === 'R') {
+        // 按 R 键重新加载视频
+        playVideo();
+      } else if (e.key === 'f' || e.key === 'F') {
+        // 按 F 键切换全屏
+        const video = document.getElementById('videoPlayer');
+        if (!document.fullscreenElement) {
+          video.requestFullscreen().catch(err => {
+            showStatus('无法进入全屏模式: ' + err.message);
+          });
+        } else {
+          document.exitFullscreen();
+        }
+      }
+    });
+  </script>
+</body>
+</html>

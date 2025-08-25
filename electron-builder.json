@@ -7,21 +7,54 @@
   "files": [
     "dist/**/*",
     "electron/**/*",
+    "package.json",
     "node_modules/**/*",
-    "ffmpeg/**/*",
-    "package.json"
-  ],
-  "asarUnpack": [
-    "ffmpeg/**/*"
+    "!node_modules/**/test/**",
+    "!node_modules/**/tests/**",
+    "!node_modules/**/*.md",
+    "!node_modules/**/*.txt",
+    "!node_modules/**/LICENSE*",
+    "!node_modules/**/CHANGELOG*",
+    "!node_modules/**/README*",
+    "!node_modules/**/.github/**",
+    "!node_modules/**/docs/**",
+    "!node_modules/**/example/**",
+    "!node_modules/**/examples/**",
+    "!src/**/*",
+    "!public/**/*",
+    "!scripts/**/*",
+    "!docs/**/*",
+    "!.github/**/*",
+    "!*.md",
+    "!*.yml",
+    "!*.yaml",
+    "!vite.config.js",
+    "!.env*",
+    "!.git*"
   ],
   "extraMetadata": {
     "main": "electron/main.cjs"
   },
+
+  "compression": "maximum",
   "linux": {
     "target": [
       {
         "target": "tar.gz",
-        "arch": ["x64", "arm64"]
+        "arch": ["arm64"]
+      }
+    ],
+    "executableArgs": [
+      "--enable-logging",
+      "--log-level=0",
+      "--v=1",
+      "--no-sandbox"
+    ],
+    "extraFiles": [
+      {
+        "from": "scripts/linux-arm64-start.sh",
+        "to": "linux-arm64-start.sh",
+        "filter": ["**/*"]
       }
     ]
   },

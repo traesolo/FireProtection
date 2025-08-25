@@ -4,7 +4,7 @@
 
 ## 功能特性
 
-- 🎥 **实时视频监控**：支持 RTSP 视频流接入和 HLS 播放
+- 🎥 **实时视频监控**：支持 RTSP 视频流接入，集成 VLC 和 HLS 播放器
 - 📊 **数据可视化**：实时显示消防设备状态和监测数据
 - 🖥️ **跨平台支持**：支持 Windows、Linux、macOS 多平台部署
 - 🏗️ **ARM64 兼容**：完整支持 ARM64 架构（包括 Apple Silicon 和 Linux ARM64）
@@ -14,7 +14,7 @@
 
 - **前端**：Vue 3, Vite, Element Plus
 - **桌面端**：Electron
-- **视频处理**：FFmpeg, HLS.js
+- **视频处理**：FFmpeg, VLC Media Player, HLS.js
 - **构建工具**：GitHub Actions
 
 ## 快速开始
@@ -24,9 +24,6 @@
 ```bash
 # 安装依赖
 npm install
-
-# 设置 FFmpeg（首次运行）
-npm run setup:ffmpeg
 
 # 启动开发服务器
 npm run dev
@@ -99,7 +96,18 @@ npm run electron:build:mac
 
 ### 视频流处理
 
-视频流现在直接从接口获取HLS流URL，使用hls.js库进行播放。
+系统支持两种视频播放方式：
+- **VLC 播放器**：默认播放器，提供更好的兼容性和稳定性
+- **HLS.js**：Web 原生播放器，适用于标准 HLS 流
+
+详细的 VLC 配置和使用说明请参考：[VLC-USAGE.md](./VLC-USAGE.md)
+
+## 相关文档
+
+- [VLC 播放器使用说明](./VLC-USAGE.md)
+- [Linux ARM64 兼容性说明](./ARM64-COMPATIBILITY.md)
+- [Linux 构建指南](./BUILD-LINUX.md)
+- [部署文档](./DEPLOYMENT.md)
 
 ## 贡献
 

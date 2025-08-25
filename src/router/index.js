@@ -1,7 +1,8 @@
-import { createRouter, createWebHistory } from 'vue-router'
+import { createRouter, createWebHashHistory } from 'vue-router'
 
 const Home = () => import('@/views/Home.vue')
 const LiShi = () => import('@/views/jilu.vue')
+const Log = () => import('@/views/Log.vue')
 
 const routes = [
     {
@@ -21,13 +22,22 @@ const routes = [
         }
     },
     {
+        path: '/log',
+        name: 'Log',
+        component: Log,
+        meta: {
+            title: '系统日志 - 消防检测系统'
+        }
+    },
+
+    {
         path: '/:pathMatch(.*)*',
         redirect: '/'
     }
 ]
 
 const router = createRouter({
-    history: createWebHistory(),
+    history: createWebHashHistory(),
     routes
 })
 

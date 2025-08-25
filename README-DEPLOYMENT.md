@@ -24,6 +24,9 @@
 - ✅ 禁用后台定时器节流
 - ✅ 禁用渲染器后台化
 - ✅ 禁用WebGL以节省GPU内存
+- ✅ 完全禁用GPU加速（适用于无GPU的一体机）
+- ✅ 禁用硬件加速视频解码/编码
+- ✅ 禁用2D画布硬件加速
 - ✅ 禁用HTTP缓存减少内存占用
 - ✅ 优化代码分割和打包体积
 
@@ -215,6 +218,42 @@ df -h
 **解决方案**:
 ```bash
 # 检查网络连接
+# 重启应用
+# 检查系统资源使用情况
+```
+
+#### 4. 视频播放失败（一体机无GPU设备/驱动问题）
+**常见错误信息**:
+```
+libGL error: glx: failed to create dri3 screen
+libGL error: failed to load driver: rockchip
+libGL error: glx: failed to create dri2 screen
+```
+
+**原因分析**:
+- 设备缺少独立GPU或GPU驱动不完整
+- rockchip等ARM芯片的GPU驱动问题
+- libGL库无法正确初始化
+- 硬件加速配置不当
+
+**解决方案**:
+- ✅ 项目已完全禁用GPU加速
+- ✅ 强制使用软件渲染器(SwiftShader)
+- ✅ 禁用所有硬件加速功能
+- ✅ 忽略GPU黑名单和阻止列表
+- ✅ ARM64设备自动禁用WebWorker
+- ✅ 启用原生HLS播放回退机制
+
+**完整GPU禁用配置**:
+```javascript
+// 已在 electron/main.cjs 中配置
+app.commandLine.appendSwitch('--disable-gpu') // 完全禁用GPU加速
+app.commandLine.appendSwitch('--use-gl', 'swiftshader') // 强制使用软件渲染器
+app.commandLine.appendSwitch('--ignore-gpu-blacklist') // 忽略GPU黑名单
+app.commandLine.appendSwitch('--ignore-gpu-blocklist') // 忽略GPU阻止列表
+app.commandLine.appendSwitch('--disable-accelerated-video-decode') // 禁用视频解码硬件加速
+app.commandLine.appendSwitch('--disable-accelerated-video-encode') // 禁用视频编码硬件加速
+app.commandLine.appendSwitch('--disable-accelerated-2d-canvas') // 禁用2D画布硬件加速
 ping 8.8.8.8
 
 # 检查磁盘使用
